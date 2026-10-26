@@ -1,0 +1,85 @@
+[package]
+name = "gino-e2ee"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96.0"
+description = "End-to-end encryption core for gino: MLS groups, exporter-derived content keys and HPKE drops."
+license = "Apache-2.0"
+repository = "https://github.com/gimhq/gino"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# AES-256-GCM of the salted envelopes; the major openmls_rust_crypto uses.
+aes-gcm = { version = "0.10.3", default-features = false, features = ["aes", "alloc"] }
+# base64url without padding for binary values on JSON wires.
+base64 = { version = "0.23", default-features = false, features = ["alloc"] }
+# Party identity keys (raw 32-byte seeds); the major openmls_rust_crypto uses.
+ed25519-dalek = "2.2"
+# HKDF-SHA256 of the per-envelope key; the major openmls_rust_crypto uses.
+hkdf = "0.13"
+openmls = "=0.9.1"
+openmls_rust_crypto = "=0.6.0"
+openmls_traits = "=0.6.0"
+# Serde form of OpenMLS leaf key pairs read back from the store.
+serde = { version = "1", features = ["derive"] }
+# AAD templates over frames and the sealed JSON wire form.
+serde_json = "1"
+# Group ids, fingerprints and file digests; the major openmls_rust_crypto uses.
+sha2 = "0.11"
+thiserror = "2"
+
+[dev-dependencies]
+# OpenMLS's own key-schedule known-answer runner and KeyPackageBundle::new
+# for the RFC 9420 test vectors.
+openmls = { version = "=0.9.1", features = ["test-utils"] }
+# Injected HPKE ephemeral key in the test-vector generator; the version hpke-rs-rust-crypto uses.
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+# Must match the wasm-bindgen-cli version exactly (docker/wasm.Dockerfile).
+wasm-bindgen = "=0.2.129"
+# OpenMLS's own randomness (getrandom 0.4) from the JS crypto API.
+openmls = { version = "=0.9.1", features = ["js"] }
+# getrandom 0.2 (via openmls_rust_crypto -> rand_core 0.6) from the JS crypto API.
+getrandom = { version = "0.2", features = ["js"] }
+
+[package.metadata.cargo-shear]
+# Only enables the `js` feature of the getrandom 0.2 used by openmls_rust_crypto.
+ignored = ["getrandom"]
+
+[profile.release]
+panic = "unwind"
+
+# Size-optimized build of the wasm package.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+
+[lints.rust]
+unsafe_code = "forbid"
+# Deny every warn-by-default lint (current + future toolchains). priority -2 lets
+# the clippy groups below (priority -1) and named lints (priority 0) override it.
+warnings = { level = "deny", priority = -2 }
+missing_debug_implementations = "warn"
+elided_lifetimes_in_paths = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# No panics in runtime paths (relaxed in tests via clippy.toml).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+dbg_macro = "deny"
+todo = "warn"
+# Pedantic lints with poor signal-to-noise for this crate.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+doc_markdown = "allow"

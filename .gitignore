@@ -1,0 +1,20 @@
+# Bun / Node
+node_modules/
+dist/
+*.log
+
+# Rust build output
+target/
+
+# Runtime data (mini-host sqlite)
+*.db
+*.db-wal
+*.db-shm
+
+# Env (commit only the examples)
+.env
+.env.*
+!.env.example
+
+# local scratch
+.tmp/

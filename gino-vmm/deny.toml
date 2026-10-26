@@ -1,0 +1,50 @@
+# cargo-deny supply-chain policy for `gino-vmm`.
+#
+# Security advisories are denied by default.
+
+[advisories]
+# A transiently-yanked transitive crate should not flake CI; real advisories are
+# still denied by default.
+yanked = "warn"
+ignore = [
+    { id = "RUSTSEC-2025-0141", reason = "bincode 2 is unmaintained with no fix; transitive via libkrun 1.19.7 (krun-devices -> imago)" },
+    # zstd 0.13 / zstd-safe 7 are pinned by libkrun 1.19.7 (krun-vmm `zstd = "0.13"`); the fixes need
+    # zstd 0.14 / zstd-safe 8. libkrun calls only `zstd::stream::copy_decode` on the operator-supplied
+    # kernel image (`ImageZstd` format): no encoder, no Seekable, no untrusted input.
+    { id = "RUSTSEC-2026-0391", reason = "zstd encoder context reuse; libkrun never encodes" },
+    { id = "RUSTSEC-2026-0398", reason = "zstd-safe Seekable::decompress; libkrun does not use Seekable" },
+    { id = "RUSTSEC-2026-0403", reason = "zstd-safe legacy-frame streaming decode failure; input is the trusted, operator-supplied kernel image" },
+]
+
+[licenses]
+# This crate is unpublished (`publish = false`); skip the license check for it.
+private = { ignore = true }
+confidence-threshold = 0.93
+# The allow-list is a permissive superset; unused entries do not warn.
+unused-allowed-license = "allow"
+# Permissive licenses only. Add a new entry only after a deliberate review.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "0BSD",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# libkrun is compiled in from its upstream repository at a pinned commit.
+allow-git = ["https://github.com/containers/libkrun.git"]

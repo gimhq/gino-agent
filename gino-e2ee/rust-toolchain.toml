@@ -1,0 +1,7 @@
+[toolchain]
+# Match the declared MSRV (Cargo.toml `rust-version`) and the gino-agent toolchain.
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+# The wasm package build target (scripts/build-wasm.sh).
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

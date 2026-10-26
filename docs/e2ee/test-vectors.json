@@ -1,0 +1,3104 @@
+{
+  "aad": [
+    {
+      "frame": {
+        "task_id": "t-1",
+        "text": "hello",
+        "type": "message"
+      },
+      "location": "scope:t-1|frame:message|field:text",
+      "template": "scope:{task_id}|frame:message|field:text"
+    },
+    {
+      "frame": {
+        "data": {
+          "input": "hello",
+          "seq": 7,
+          "task_id": "t-1",
+          "thread_id": "01jbx0q7m0v3k2m4n5p6q7r8s9"
+        },
+        "type": "thread_message"
+      },
+      "location": "scope:t-1|frame:thread_message|thread:01jbx0q7m0v3k2m4n5p6q7r8s9|seq:7|field:input",
+      "template": "scope:{data.task_id}|frame:thread_message|thread:{data.thread_id}|seq:{data.seq}|field:input"
+    },
+    {
+      "element": 1,
+      "frame": {
+        "data": {
+          "attachments": [
+            {
+              "id": "a-0"
+            },
+            {
+              "id": "a-1"
+            }
+          ]
+        },
+        "task_id": "t-1",
+        "type": "output"
+      },
+      "location": "scope:t-1|frame:output|attachment:a-1|field:bytes",
+      "template": "scope:{task_id}|frame:output|attachment:{data.attachments[].id}|field:bytes"
+    },
+    {
+      "frame": {
+        "data": {
+          "delivery": "d:1",
+          "seq": 0
+        },
+        "task_id": "task:42"
+      },
+      "location": "scope:task:42|frame:result|delivery:d:1|seq:0",
+      "template": "scope:{task_id}|frame:result|delivery:{data.delivery}|seq:{data.seq}"
+    },
+    {
+      "frame": {
+        "scope": "t-1"
+      },
+      "location": "scope:t-1|epoch_link:8",
+      "template": "scope:{scope}|epoch_link:8"
+    }
+  ],
+  "content": [
+    {
+      "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+      "envelope_b64url": "AQEAAQAAAAAAAAAA-70yLddecHWCwhjrxvlhMwWEv8saGy3fqYp5dMaW4B2TSRRIqgNRmx2rjzBdAR5bX1utSdY",
+      "epoch": 0,
+      "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+      "k_msg": "41999bdf86b2451e259b8317bdbb67dddb5fed2150e0b9b471ff313f5fc5e831",
+      "location": "scope:t-1|frame:message|field:text",
+      "plaintext": "68656c6c6f",
+      "salt": "fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d"
+    },
+    {
+      "envelope": "010100010000000000000005afd82df48c0fc826b039a9450ac7690c3b24cd5be6afa0681e3c7f89a2eb908a094a15a2457e6b9d1f3aaaa0ff15e04a",
+      "envelope_b64url": "AQEAAQAAAAAAAAAFr9gt9IwPyCawOalFCsdpDDskzVvmr6BoHjx_iaLrkIoJShWiRX5rnR86qqD_FeBK",
+      "epoch": 5,
+      "k_e": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94",
+      "k_msg": "b70500583b362437e8de86669537bca2cada59f9e2b7eb5c0f923bd74713514b",
+      "location": "scope:t-1|frame:thread_message|thread:01jbx0q7m0v3k2m4n5p6q7r8s9|seq:7|field:input",
+      "plaintext": "",
+      "salt": "afd82df48c0fc826b039a9450ac7690c3b24cd5be6afa0681e3c7f89a2eb908a"
+    },
+    {
+      "envelope": "0101000100000100000000018ab0abf56b1890e68d396a8abe22299f7a6ebe1d732a14a6960b6f1565eba7d2458d42098c3f82d809470165a5f90527a84685da8b33377a220922947cf550f8ed05ce78ce1d",
+      "envelope_b64url": "AQEAAQAAAQAAAAABirCr9WsYkOaNOWqKviIpn3puvh1zKhSmlgtvFWXrp9JFjUIJjD-C2AlHAWWl-QUnqEaF2oszN3oiCSKUfPVQ-O0FznjOHQ",
+      "epoch": 1099511627777,
+      "k_e": "8b10aa02a2aa15d1011988708b5a7bf780de746150af1b7dce500176631cdbf0",
+      "k_msg": "cfbf1dc0dd88fc0b2761c58647b429d06357ec023bfb7f2f87d8a6d9db2e1c86",
+      "location": "scope:t-1|frame:thread_message|thread:01jbx0q7m0v3k2m4n5p6q7r8s9|seq:7|field:input",
+      "plaintext": "7b2261223a5b312c2262225d2c2263223a6e756c6c7d",
+      "salt": "8ab0abf56b1890e68d396a8abe22299f7a6ebe1d732a14a6960b6f1565eba7d2"
+    }
+  ],
+  "drop": [
+    {
+      "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+      "envelope": "010300010000000000000002f8d7e35e85f23c097e2d5cdc2d7e81e4cb42a34a9ee4863771b41dafed5e1e593aa95ed7173b4e40f93f1e73fba3bf83ebcee7615791378fc6334d3b3bac8f7a0086186792b1",
+      "epoch": 2,
+      "ikm_e": "0a6b25cd861a38d2a35e65664ff0a60a87d41be275aa48e2a81ce58a3a99361d",
+      "location": "scope:t-1|frame:inbound|field:body",
+      "pk": "93cbbb8ce70508ea3c51ced909698ea98253a4a0de161bf18462947717fd5931",
+      "plaintext": "73796e74686574696320776562686f6f6b20626f6479",
+      "sk": "55f49fa1f16c379469ae4e0fb4b3cb6f30662f9cece8263ce4ed71305f6918bb"
+    },
+    {
+      "d_e": "c5d67e59e8e1ef86e9556d73d9b7354c2b16e59b4ef222c7b989687f6fbda481",
+      "envelope": "0103000100000000000000001f08693d05f73768c89f4d42639c4df02d8c6865fbbfdf514917c9ec57b0cd6a743ab29c5303ecf5611e822c24a694f6",
+      "epoch": 0,
+      "ikm_e": "c46d836d24d63e4387ab98fb9f0dae557d92215e7cb3e8d647ae11e059a8db61",
+      "location": "scope:t-1|frame:inbound|field:body",
+      "pk": "497a8ecea89ee8b7fd6726907e66262a708badf908538be51e51a091ab8ebb43",
+      "plaintext": "",
+      "sk": "cbfdf21ffa3e598311e99743df4d6480453a082915e32c315d2c2a5d546d4fbd"
+    }
+  ],
+  "envelope_version": 1,
+  "epoch_link": [
+    {
+      "d_e": "c5d67e59e8e1ef86e9556d73d9b7354c2b16e59b4ef222c7b989687f6fbda481",
+      "envelope": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+      "epoch": 0,
+      "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+      "k_next": "274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff5",
+      "salt": "2adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62c",
+      "scope": "t-1"
+    },
+    {
+      "d_e": "66af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c26",
+      "envelope": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+      "epoch": 1,
+      "k_e": "274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff5",
+      "k_next": "3b0244cb1eb83feb2e195dbc84009ca350da35e372a237c36a82ef047df1906c",
+      "salt": "97c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f1",
+      "scope": "t-1"
+    },
+    {
+      "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+      "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+      "epoch": 2,
+      "k_e": "3b0244cb1eb83feb2e195dbc84009ca350da35e372a237c36a82ef047df1906c",
+      "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+      "salt": "c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a",
+      "scope": "t-1"
+    },
+    {
+      "d_e": "5396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c3799720",
+      "envelope": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+      "epoch": 3,
+      "k_e": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+      "k_next": "18383946b324317a549364465d326e30d9423a1ff5d490d20c7797465eafb24b",
+      "salt": "bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7a",
+      "scope": "t-1"
+    },
+    {
+      "d_e": "86bd5dfa4419ca24d7d73b746d383c6dc9ff03133fcec1de25e2e33177a98244",
+      "envelope": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b",
+      "epoch": 4,
+      "k_e": "18383946b324317a549364465d326e30d9423a1ff5d490d20c7797465eafb24b",
+      "k_next": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94",
+      "salt": "92b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b11",
+      "scope": "t-1"
+    }
+  ],
+  "field_map": [
+    {
+      "description": "message with text and attachments, one without a name",
+      "frame": {
+        "data": {
+          "attachments": [
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-a",
+              "name": "report.pdf",
+              "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 120
+            },
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-b",
+              "ref": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "size": 120
+            },
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-c",
+              "name": "notes.txt",
+              "ref": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.bin",
+              "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "size": 120
+            }
+          ],
+          "text": "summarize the report"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "cb9b117b53e7daca4cda83735cfc6793b79fd2b8a659be14914cabaf9d295925",
+        "5785267691d7514ca9ca7b7ae4ac4cbe8176966595a5c5b40d13f948bcd81ca7",
+        "27d8a44bd68095aa71dafed7c1acf2f9ae0abaac73802bbb27b86b4e85b801e0"
+      ],
+      "sealed_frame": {
+        "data": {
+          "attachments": [
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-a",
+              "name": {
+                "e2ee": "AQEAAQAAAAAAAAAFV4UmdpHXUUypynt65KxMvoF2lmWVpcW0DRP5SLzYHKf-m9jxIwvIuwun9PLjyqRGNpSjwFheD2rZ_w"
+              },
+              "ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 120
+            },
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-b",
+              "ref": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "size": 120
+            },
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-c",
+              "name": {
+                "e2ee": "AQEAAQAAAAAAAAAFJ9ikS9aAlapx2v7Xwazy-a4KuqxzgCu7J7hrToW4AeDgKrtRIRxf02v_HYknP05wPQLFBlHis8Pv"
+              },
+              "ref": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.bin",
+              "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "size": 120
+            }
+          ],
+          "text": {
+            "e2ee": "AQEAAQAAAAAAAAAFy5sRe1Pn2spM2oNzXPxnk7ef0rimWb4UkUyrr50pWSVc3AgxtbfQE6PcDjq2Ald6oN9HafaszBtm4aK2W7uGwtktw-4"
+          }
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "message without attachments",
+      "frame": {
+        "data": {
+          "text": "hello"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "7a929bb95263a0a881fd06e96b53746ce32ab580da8a1ae5b26de4acba72ee73"
+      ],
+      "sealed_frame": {
+        "data": {
+          "text": {
+            "e2ee": "AQEAAQAAAAAAAAAFepKbuVJjoKiB_Qbpa1N0bOMqtYDaihrlsm3krLpy7nPMK-1H39ll01mds6cK2LA5b7Y0ZWs"
+          }
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "cron_upsert prompt",
+      "frame": {
+        "cronId": "cr-1",
+        "data": {
+          "prompt": "daily digest",
+          "schedule": "0 9 * * *"
+        },
+        "taskId": "t-1",
+        "type": "cron_upsert"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "a5c26bb678b1da68120ebf56ece8c33ef810bc148a8199f239204689edc2373b"
+      ],
+      "sealed_frame": {
+        "cronId": "cr-1",
+        "data": {
+          "prompt": {
+            "e2ee": "AQEAAQAAAAAAAAAFpcJrtnix2mgSDr9W7OjDPvgQvBSKgZnyOSBGie3CNzsK75jLHY8kYPGV4HPBqYk3T08oMA_e8u9K4yt_"
+          },
+          "schedule": "0 9 * * *"
+        },
+        "taskId": "t-1",
+        "type": "cron_upsert"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "thread_message text",
+      "frame": {
+        "data": {
+          "content": "Done.",
+          "kind": "text",
+          "role": "assistant",
+          "seq": 1
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "5bc14eedef8b308bbb4208264aedec5edaf8dbc6f54db284c1cfa5594d6875c2"
+      ],
+      "sealed_frame": {
+        "data": {
+          "content": {
+            "e2ee": "AQEAAQAAAAAAAAAFW8FO7e-LMIu7QggmSu3sXtr428b1TbKEwc-lWU1odcI-WWdmvYALqDT_fMB2voxP2hG5tfc"
+          },
+          "kind": "text",
+          "role": "assistant",
+          "seq": 1
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "thread_message tool_use input",
+      "frame": {
+        "data": {
+          "input": {
+            "command": "ls -la",
+            "timeout": 30
+          },
+          "kind": "tool_use",
+          "seq": 2,
+          "tool": "bash",
+          "tool_use_id": "tu-1"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "68785ecf4ed84e53b112408e1619ca13de81329794a9f3d90f190f5497665dc3"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "e2ee": "AQEAAQAAAAAAAAAFaHhez07YTlOxEkCOFhnKE96BMpeUqfPZDxkPVJdmXcMH3ox4-5dr52heXdmIdBdsrZyrLKf9zxu621z5lJoSUi4FcROy7a1gCzrhey25bRzL"
+          },
+          "kind": "tool_use",
+          "seq": 2,
+          "tool": "bash",
+          "tool_use_id": "tu-1"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "thread_message tool_result output content",
+      "frame": {
+        "data": {
+          "kind": "tool_result",
+          "output": {
+            "content": [
+              {
+                "text": "a b c",
+                "type": "text"
+              }
+            ],
+            "is_error": false
+          },
+          "seq": 3,
+          "tool_use_id": "tu-1"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "bf2e8ee8dd91a34393272c6328b9dd0ab6380e3cd06618f15204d083778a3fbc"
+      ],
+      "sealed_frame": {
+        "data": {
+          "kind": "tool_result",
+          "output": {
+            "content": {
+              "e2ee": "AQEAAQAAAAAAAAAFvy6O6N2Ro0OTJyxjKLndCrY4DjzQZhjxUgTQg3eKP7zHDx4IwZBSqKbu6FwAVbYjLSNAnTSkpZ7jj7q8IAWEi6-D-e_WG-cl8Ghkis_R_OY"
+            },
+            "is_error": false
+          },
+          "seq": 3,
+          "tool_use_id": "tu-1"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "thread_message host_action params sealed whole (empty table)",
+      "frame": {
+        "data": {
+          "content": "setting status",
+          "input": {
+            "method": "issue.set_status",
+            "params": {
+              "issue_id": "i-1",
+              "status": "done"
+            }
+          },
+          "kind": "host_action",
+          "seq": 4
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "2a3a87d3c6f85aa56d9234f71b837b3847b71f33adbe9f21aa75991b7ebd2d09",
+        "4eb0da112db47aec364d883caaf165180d9f30ec718c50f6fd55fdcb93537acf"
+      ],
+      "sealed_frame": {
+        "data": {
+          "content": {
+            "e2ee": "AQEAAQAAAAAAAAAFKjqH08b4WqVtkjT3G4N7OEe3HzOtvp8hqnWZG369LQnzCQepB67MRdWTLBbTESM1x9ogBqIpP7h0iadA9BI"
+          },
+          "input": {
+            "method": "issue.set_status",
+            "params": {
+              "e2ee": "AQEAAQAAAAAAAAAFTrDaES20euw2TYg8qvFlGA2fMOxxjFD2_VX9y5NTes8scAOqG_0bkSBqs3AQphH_KbF6xb-YcJ-iSfi9afhuARTeZR6FqgqlhfiqGb6RphXduQ"
+            }
+          },
+          "kind": "host_action",
+          "seq": 4
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "thread_result with result, null error and an attachment",
+      "frame": {
+        "data": {
+          "attachments": [
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-d",
+              "name": "out.log",
+              "ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.bin",
+              "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "size": 120
+            }
+          ],
+          "duration_ms": 1200,
+          "error": null,
+          "result": "All tests pass.",
+          "status": "succeeded"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vx",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_result"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "3d2d3e3e906f3a97d38bf03eb4f57faf853335f069dfdd070ea53b58287f1dfe",
+        "e7623e8c13e5516082bcc5a6e502cabbdd8ef3b161d72e3f7ec9a9285eecdc27"
+      ],
+      "sealed_frame": {
+        "data": {
+          "attachments": [
+            {
+              "content_type": "application/octet-stream",
+              "direction": "in",
+              "id": "att-d",
+              "name": {
+                "e2ee": "AQEAAQAAAAAAAAAF52I-jBPlUWCCvMWm5QLKu92O87Fh1y4_fsmpKF7s3CeBeaV77wu1sWU7X3xHlu9BndrlXteFbA"
+              },
+              "ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.bin",
+              "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "size": 120
+            }
+          ],
+          "duration_ms": 1200,
+          "error": null,
+          "result": {
+            "e2ee": "AQEAAQAAAAAAAAAFPS0-PpBvOpfTi_A-tPV_r4UzNfBp390HDqU7WCh_Hf5ctvJ5Ec0vWK6NQCxLlHfErKyo12NjrP7o1MxXczC1"
+          },
+          "status": "succeeded"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vx",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_result"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "thread_result failure",
+      "frame": {
+        "data": {
+          "error": "boom",
+          "failure_reason": "agent.crash",
+          "status": "failed"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vx",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_result"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [
+        "a1b0952b8fe50d46e91f6364071d96d052580c0ec86aae56b297d512d179577c"
+      ],
+      "sealed_frame": {
+        "data": {
+          "error": {
+            "e2ee": "AQEAAQAAAAAAAAAFobCVK4_lDUbpH2NkBx2W0FJYDA7Iaq5WspfVEtF5V3ytWIwLiaqTyL6r5MRXZhosKlTTjg"
+          },
+          "failure_reason": "agent.crash",
+          "status": "failed"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vx",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_result"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "frame type without rules",
+      "frame": {
+        "data": {
+          "text": "plain"
+        },
+        "taskId": "t-1",
+        "type": "heartbeat"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "text": "plain"
+        },
+        "taskId": "t-1",
+        "type": "heartbeat"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "split value with nested plain paths",
+      "frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "empty": {},
+              "fields": {
+                "body": "B",
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": "N"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [
+        "e91ccf876d274c4127ca356caa68519f96eac4d77ace5f4120d9a9537123720d",
+        "da7479752cf91a0ca27c0a5d08e89e94e7e835f00d76cafb869d5514f2996228",
+        "a7ca389d32f1c0c4d2d6c5d5e9df79f442278bb58a1e48307b857081503e4444"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "empty": {
+                "e2ee": "AQEAAQAAAAAAAAAF6RzPh20nTEEnyjVsqmhRn5bqxNd6zl9BINmpU3Ejcg0pjufLrbyCctC9pOqWj32iNFQ"
+              },
+              "fields": {
+                "body": {
+                  "e2ee": "AQEAAQAAAAAAAAAF2nR5dSz5GgyifApdCOielOfoNfANdsr7hp1VFPKZYij__AIQpzMLCxUjB9uwZMZAU4o7"
+                },
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": {
+                "e2ee": "AQEAAQAAAAAAAAAFp8o4nTLxwMTS1sXV6d959EIni7WKHkgwe4VwgVA-RETxZ6cocwq1fmyp1OGwFEJiQoIG"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "split value with an element plain path",
+      "frame": {
+        "data": {
+          "input": {
+            "method": "items.tag",
+            "params": {
+              "items": [
+                {
+                  "id": "1",
+                  "x": "y"
+                },
+                {
+                  "id": "2"
+                }
+              ]
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [
+        "feb8dc203969ad670568d4f51b81c95bb6b2b437c5da6323556b5d92bad427d5"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "items.tag",
+            "params": {
+              "items": [
+                {
+                  "id": "1",
+                  "x": {
+                    "e2ee": "AQEAAQAAAAAAAAAF_rjcIDlprWcFaNT1G4HJW7aytDfF2mMjVWtdkrrUJ9XPKi4EY3zo6n9u3AIxPnr9cStv"
+                  }
+                },
+                {
+                  "id": "2"
+                }
+              ]
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "split value with a scalar at a descend position",
+      "frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "fields": "scalar",
+              "labels": {}
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [
+        "6ff359d8ca2603f8e0ead62993bc18350b250698f6986ff7226a522d7fc779bd",
+        "7c14c208fb39768b365a486fbca55022cb7aff3e36ff7265ed60466bd4097bc7"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "fields": {
+                "e2ee": "AQEAAQAAAAAAAAAFb_NZ2MomA_jg6tYpk7wYNQslBpj2mG_3ImpSLX_Heb25By2cu-xCt8LBqHnf7-3DMfYCsTOxzJA"
+              },
+              "labels": {
+                "e2ee": "AQEAAQAAAAAAAAAFfBTCCPs5dos2WkhvvKVQIst6_z42_3Jl7WBGa9QJe8eFSYuq1p4QKiHyxl-2VRZ2AVY"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "non-object value of a split rule sealed whole",
+      "frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": [
+              "a",
+              "b"
+            ]
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [
+        "d2597a5bd2672783552df66389697ac8d213804519881145d841802390f38d0a"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "e2ee": "AQEAAQAAAAAAAAAF0ll6W9JnJ4NVLfZjiWl6yNITgEUZiBFF2EGAI5DzjQpMkI2Tqp6jS3yp_joTjD-9jG4tWMhUInvs"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "method not in the table sealed whole",
+      "frame": {
+        "data": {
+          "input": {
+            "method": "unknown",
+            "params": {
+              "fields": {
+                "title": "T"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [
+        "043460da571608d2d6ad8a09a6e7853741a9c0bfa31b4ac6a9eca93d9e955efd"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "unknown",
+            "params": {
+              "e2ee": "AQEAAQAAAAAAAAAFBDRg2lcWCNLWrYoJpueFN0GpwL-jG0rGqeypPZ6VXv1LMzfceGnh7cusk2-wugtZAy0lkikjctjURdlatPAuwZc_F9JtMRIf"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "method with no plain paths sealed whole",
+      "frame": {
+        "data": {
+          "input": {
+            "method": "noop",
+            "params": {
+              "fields": {
+                "title": "T"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [
+        "45d5b57835609347f54198f68a4a988759b1e9e6c4036e1901c713a742208b37"
+      ],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "noop",
+            "params": {
+              "e2ee": "AQEAAQAAAAAAAAAFRdW1eDVgk0f1QZj2ikqYh1mx6ebEA24ZAccTp0IgizeAvDqlZf1NjEaSh90UmFVLknc2TcE5Umam-iadnH2XL-6lOtdUiQ98"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "plaintext in a mapped field",
+      "error": {
+        "code": "plaintext_rejected"
+      },
+      "frame": {
+        "data": {
+          "text": "hello"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "text": "hello"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "sealed form with extra members",
+      "error": {
+        "code": "malformed"
+      },
+      "frame": {
+        "data": {
+          "text": "hello"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "text": {
+            "e2ee": "AQEAAQAAAAAAAAAFepKbuVJjoKiB_Qbpa1N0bOMqtYDaihrlsm3krLpy7nPMK-1H39ll01mds6cK2LA5b7Y0ZWs",
+            "kind": "text"
+          }
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "flipped tag byte",
+      "error": {
+        "code": "open_failed",
+        "epoch": 5
+      },
+      "frame": {
+        "data": {
+          "text": "hello"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "text": {
+            "e2ee": "AQEAAQAAAAAAAAAFepKbuVJjoKiB_Qbpa1N0bOMqtYDaihrlsm3krLpy7nPMK-1H39ll01mds6cK2LA5b7Y0ZWo"
+          }
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "file envelope at a text field",
+      "error": {
+        "code": "malformed"
+      },
+      "frame": {
+        "data": {
+          "text": "hello"
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "text": {
+            "e2ee": "AQIAAQAAAAAAAAAFaw9INvw8mv-WE4Ija9lZ2CA4yMNlkHoEX-butDFA3QrpTpQawSGU-Hjhbs8_4pk0iLcxasI"
+          }
+        },
+        "taskId": "t-1",
+        "type": "message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "ciphertext moved to another seq",
+      "error": {
+        "code": "open_failed",
+        "epoch": 5
+      },
+      "frame": {
+        "data": {
+          "content": "Done.",
+          "kind": "text",
+          "role": "assistant",
+          "seq": 2
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "content": {
+            "e2ee": "AQEAAQAAAAAAAAAFW8FO7e-LMIu7QggmSu3sXtr428b1TbKEwc-lWU1odcI-WWdmvYALqDT_fMB2voxP2hG5tfc"
+          },
+          "kind": "text",
+          "role": "assistant",
+          "seq": 2
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_message"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "a | in a placeholder value",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "frame": {
+        "data": {
+          "content": "Done.",
+          "kind": "text",
+          "role": "assistant",
+          "seq": 1
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vw",
+        "taskId": "t-1",
+        "threadId": "c|9",
+        "type": "thread_message"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": null,
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "one field fails, nothing is opened",
+      "error": {
+        "code": "open_failed",
+        "epoch": 5
+      },
+      "frame": {
+        "data": {
+          "error": "boom",
+          "failure_reason": "agent.crash",
+          "result": "partial",
+          "status": "failed"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vx",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_result"
+      },
+      "profile": "gino.task-content.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "error": {
+            "e2ee": "AQEAAQAAAAAAAAAF1Xmq1nM61xhvDKZBvpLX1Q87RPOq1LUrWkSFtby6S0PxgN5D0m-ljprWqAMHlc3rL-9HtQ"
+          },
+          "result": {
+            "e2ee": "AQEAAQAAAAAAAAAF1kTF1G6c_dRKxcVyf3PvQf8g1kLvJhsrQHNxOB5hxDi8779piMTxE1kibouyqUaZIz0s81sOGQ"
+          },
+          "status": "failed"
+        },
+        "outboxId": "01jab3x7k2m4n5p6q7r8s9t0vx",
+        "taskId": "t-1",
+        "threadId": "01jbx0q7m0v3k2m4n5p6q7r8s9",
+        "type": "thread_result"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "plaintext part at a sealed position",
+      "error": {
+        "code": "plaintext_rejected"
+      },
+      "frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "empty": {},
+              "fields": {
+                "body": "B",
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": "N"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "empty": {
+                "e2ee": "AQEAAQAAAAAAAAAF6RzPh20nTEEnyjVsqmhRn5bqxNd6zl9BINmpU3Ejcg0pjufLrbyCctC9pOqWj32iNFQ"
+              },
+              "fields": {
+                "body": {
+                  "e2ee": "AQEAAQAAAAAAAAAF2nR5dSz5GgyifApdCOielOfoNfANdsr7hp1VFPKZYij__AIQpzMLCxUjB9uwZMZAU4o7"
+                },
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": "N"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "split value for a discriminator that selects whole sealing",
+      "error": {
+        "code": "plaintext_rejected"
+      },
+      "frame": {
+        "data": {
+          "input": {
+            "method": "unknown",
+            "params": {
+              "empty": {},
+              "fields": {
+                "body": "B",
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": "N"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "unknown",
+            "params": {
+              "empty": {
+                "e2ee": "AQEAAQAAAAAAAAAF6RzPh20nTEEnyjVsqmhRn5bqxNd6zl9BINmpU3Ejcg0pjufLrbyCctC9pOqWj32iNFQ"
+              },
+              "fields": {
+                "body": {
+                  "e2ee": "AQEAAQAAAAAAAAAF2nR5dSz5GgyifApdCOielOfoNfANdsr7hp1VFPKZYij__AIQpzMLCxUjB9uwZMZAU4o7"
+                },
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": {
+                "e2ee": "AQEAAQAAAAAAAAAFp8o4nTLxwMTS1sXV6d959EIni7WKHkgwe4VwgVA-RETxZ6cocwq1fmyp1OGwFEJiQoIG"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "a key with . on a concrete path (sealing)",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "a.b": "v",
+              "fields": {
+                "title": "T"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [],
+      "sealed_frame": null,
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    },
+    {
+      "description": "a key with | on a concrete path (reading)",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "empty": {},
+              "fields": {
+                "body": "B",
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": "N"
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "map": {
+        "format": "gino-e2ee/field-map/v1",
+        "frames": {
+          "action": {
+            "direction": "agent_to_host",
+            "fields": [
+              {
+                "aad": "scope:{taskId}|frame:action|seq:{data.seq}|field:input.params",
+                "envelopes": [
+                  "content"
+                ],
+                "keyed_plain": {
+                  "key": "data.input.method",
+                  "table": {
+                    "form.submit": [
+                      "fields.title",
+                      "labels[]"
+                    ],
+                    "items.tag": [
+                      "items[].id"
+                    ],
+                    "noop": []
+                  }
+                },
+                "kind": "json",
+                "path": "data.input.params"
+              }
+            ],
+            "scope": "taskId"
+          }
+        },
+        "profile": "test.split.v1"
+      },
+      "profile": "test.split.v1",
+      "salts": [],
+      "sealed_frame": {
+        "data": {
+          "input": {
+            "method": "form.submit",
+            "params": {
+              "a|b": {
+                "e2ee": "AQEAAQAAAAAAAAAFp8o4nTLxwMTS1sXV6d959EIni7WKHkgwe4VwgVA-RETxZ6cocwq1fmyp1OGwFEJiQoIG"
+              },
+              "empty": {
+                "e2ee": "AQEAAQAAAAAAAAAF6RzPh20nTEEnyjVsqmhRn5bqxNd6zl9BINmpU3Ejcg0pjufLrbyCctC9pOqWj32iNFQ"
+              },
+              "fields": {
+                "body": {
+                  "e2ee": "AQEAAQAAAAAAAAAF2nR5dSz5GgyifApdCOielOfoNfANdsr7hp1VFPKZYij__AIQpzMLCxUjB9uwZMZAU4o7"
+                },
+                "title": "T"
+              },
+              "labels": [
+                "a",
+                "b"
+              ],
+              "note": {
+                "e2ee": "AQEAAQAAAAAAAAAFp8o4nTLxwMTS1sXV6d959EIni7WKHkgwe4VwgVA-RETxZ6cocwq1fmyp1OGwFEJiQoIG"
+              }
+            }
+          },
+          "seq": 3
+        },
+        "taskId": "t-1",
+        "type": "action"
+      },
+      "secrets": {
+        "5": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        }
+      }
+    }
+  ],
+  "file": [
+    {
+      "envelope": "010200010000000000000003f6e34713dd512531ec4560068c187315456b1a4951afb98b3e93ce3af43a57deb16a477d942ed0a79e97ec76048677b1772ed5472515d39fccdece4b306bbe060afae56b1057c748bf4c03f54c7f7d62f4978302ea62268cd1f74f04209e7190d304a7d68332b9de81a7e662d86f6e8c5979015547d36436838fb5787ba8828fd5d51b6ba505c493cb7da54b7ea469ac9d842d8f42cae5789d8189569aeb66eecb387e9ccd405caf1b1e90c55b1bd3b00578685ea8f2a555804afdd70fb011b6829308b7b949c47ae9c1d50c946ca62a20fa5d6d864d0428dd6f705dbd2c542328db63becba9d68c67f47be8de22a5fd17a81105830b6959d0d3cf2ba4a474d1dbab6e415fa4c3c60a74278b533e6bd88245ffc5a673856805b2ad4f2e8e92a8892994add1cd61f278b5d95dafd12dc6",
+      "epoch": 3,
+      "k_e": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+      "location": "scope:t-1|frame:output|attachment:a-1|field:bytes",
+      "plaintext": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "salt": "f6e34713dd512531ec4560068c187315456b1a4951afb98b3e93ce3af43a57de",
+      "sha256": "be9c6e12f34ead370c72490e92f8af721544a90517e01b0be43ca8f77c0543b3",
+      "size": 316
+    },
+    {
+      "envelope": "0102000100000000000000002506198d50ffd9e98c0735a467695cb741697589397fb4a9b0bcc105c80d0d1ccc9d13f95e41bcec7b4c96c46ba336fd",
+      "epoch": 0,
+      "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+      "location": "scope:t-1|frame:output|attachment:a-1|field:bytes",
+      "plaintext": "",
+      "salt": "2506198d50ffd9e98c0735a467695cb741697589397fb4a9b0bcc105c80d0d1c",
+      "sha256": "780ba376e6e234792957cb40d3190ac7de27e7ce15bc9b57ca31a62dc70f8d20",
+      "size": 60
+    }
+  ],
+  "fingerprint": [
+    {
+      "display": "7b04 41a5 193c 9fba 2e9e 3ec5 5f16 db5a a7fa 01da e0bf b196 7d8c a474 8f62 6358",
+      "fingerprint": "7b0441a5193c9fba2e9e3ec55f16db5aa7fa01dae0bfb1967d8ca4748f626358",
+      "public_key": "780e78b096cb53efec58dcac579e1f6368396df43960ce9a5552f89dc38c4b74"
+    },
+    {
+      "display": "f761 05a1 e989 46f2 3f61 e1fa 7f5b 74cf 9097 ec85 0a36 9510 1e1c 9cd9 2c3c 70fa",
+      "fingerprint": "f76105a1e98946f23f61e1fa7f5b74cf9097ec850a3695101e1c9cd92c3c70fa",
+      "public_key": "a34a9bde566b951e9403cc754fe2bfe439ac9e64ea077b91848edc11783f96fe"
+    }
+  ],
+  "format": "gino-e2ee/test-vectors/v1",
+  "group_id": [
+    {
+      "group_id": "6763685219e64984d3613f0cbee965fd5c06fa65dc0b1640bc0565c430798860",
+      "profile": "gino.task-content.v1",
+      "scope": "t-1"
+    },
+    {
+      "group_id": "24ee08e37c7d76c0bb9d2186cca811e1ec1699fd7dcbb02a26b7ecdc0c149549",
+      "profile": "gino.task-content.v1",
+      "scope": "01jbx0q7m0v3k2m4n5p6q7r8s9"
+    }
+  ],
+  "history_walk": [
+    {
+      "content": [
+        {
+          "envelope": "010100010000000000000000dfd52613a3d9ad0c69d94dbc132f1623648c8b14aa46c56ed9ef24c2766e2e50819aa7784b657661b103bf9f45d1311a2ef2b0478fb5b29dc17d2ac1875541522421",
+          "epoch": 0,
+          "location": "scope:t-1|frame:message|seq:0|field:text",
+          "plaintext": "6d657373616765206f662065706f63682030"
+        },
+        {
+          "envelope": "010100010000000000000001e915de1148cc4aef3f22774fd403aa1220657a300aa182b1e906ff20e014b50063ff3cdf8477bd5de137f16768833a4c898c04a81242119d4574e9dab57ba8352862",
+          "epoch": 1,
+          "location": "scope:t-1|frame:message|seq:1|field:text",
+          "plaintext": "6d657373616765206f662065706f63682031"
+        },
+        {
+          "envelope": "010100010000000000000002e88883f0018e6415306e95afd52888365c942dd46dcb39ece2f8682e75259011284df974c2528c7dc43d1d37e57b09d9b76751adc9b64f3a8cd3cf831dc6401f236b",
+          "epoch": 2,
+          "location": "scope:t-1|frame:message|seq:2|field:text",
+          "plaintext": "6d657373616765206f662065706f63682032"
+        },
+        {
+          "envelope": "010100010000000000000003a15d38704d1f519697a001a8bbfe0315ca17a013bb43999a6fdee42d0739d4b22872d648eeced7f498f2b491f2ee741aed7767b87249a8c85cfb619bf77e1b0cf98d",
+          "epoch": 3,
+          "location": "scope:t-1|frame:message|seq:3|field:text",
+          "plaintext": "6d657373616765206f662065706f63682033"
+        },
+        {
+          "envelope": "0101000100000000000000046f1e847a1db4906721e5eb6c7540cab10ffce5a8f56e1715e3a728a5283d63bffc2feb5aa7614e91ca94c595f6a731c3620f1887f95797f3d9eec05d7ff9c52aed74",
+          "epoch": 4,
+          "location": "scope:t-1|frame:message|seq:4|field:text",
+          "plaintext": "6d657373616765206f662065706f63682034"
+        },
+        {
+          "envelope": "010100010000000000000005f7717ffc048519e82ef0a56a48b15ff6e74220f1636fe633031a8688ee7a41355415f4c1dae5fc3efe22c8b514c631df102ad52000ef561f768e745b7b15aa3b4c9d",
+          "epoch": 5,
+          "location": "scope:t-1|frame:message|seq:5|field:text",
+          "plaintext": "6d657373616765206f662065706f63682035"
+        },
+        {
+          "envelope": "010300010000000000000001edefc33c61ccfbf087fbe9f5d643ab787e12f2ae66e792759d05a02967df3248443050b529a233749bf13a7218e8f0e66dca8ab4fd7410383ef2fafcc8e671",
+          "epoch": 1,
+          "location": "scope:t-1|frame:inbound|seq:1|field:body",
+          "plaintext": "64726f70206f662065706f63682031"
+        },
+        {
+          "envelope": "010100010000000000000006015fb6589b171586a8799090c4c90c70d93fd9d8564c243fee3fb42ee213f93c441c83f576e26332b687d7d088ffc30b5a16f2d323c8e6f6837d3ebc6eeb6920f736",
+          "epoch": 6,
+          "error": {
+            "code": "epoch_unknown",
+            "epoch": 6
+          },
+          "location": "scope:t-1|frame:message|seq:6|field:text"
+        }
+      ],
+      "current": {
+        "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+        "epoch": 5,
+        "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+      },
+      "description": "full: every epoch readable, the next epoch unknown",
+      "links": {
+        "1": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+        "2": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+        "3": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+        "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+      },
+      "policy": "full",
+      "scope": "t-1"
+    },
+    {
+      "content": [
+        {
+          "envelope": "010100010000000000000000dfd52613a3d9ad0c69d94dbc132f1623648c8b14aa46c56ed9ef24c2766e2e50819aa7784b657661b103bf9f45d1311a2ef2b0478fb5b29dc17d2ac1875541522421",
+          "epoch": 0,
+          "error": {
+            "code": "history_unavailable",
+            "epoch": 0
+          },
+          "location": "scope:t-1|frame:message|seq:0|field:text"
+        },
+        {
+          "envelope": "010100010000000000000002e88883f0018e6415306e95afd52888365c942dd46dcb39ece2f8682e75259011284df974c2528c7dc43d1d37e57b09d9b76751adc9b64f3a8cd3cf831dc6401f236b",
+          "epoch": 2,
+          "error": {
+            "code": "history_unavailable",
+            "epoch": 2
+          },
+          "location": "scope:t-1|frame:message|seq:2|field:text"
+        },
+        {
+          "envelope": "010100010000000000000003a15d38704d1f519697a001a8bbfe0315ca17a013bb43999a6fdee42d0739d4b22872d648eeced7f498f2b491f2ee741aed7767b87249a8c85cfb619bf77e1b0cf98d",
+          "epoch": 3,
+          "location": "scope:t-1|frame:message|seq:3|field:text",
+          "plaintext": "6d657373616765206f662065706f63682033"
+        },
+        {
+          "envelope": "0101000100000000000000046f1e847a1db4906721e5eb6c7540cab10ffce5a8f56e1715e3a728a5283d63bffc2feb5aa7614e91ca94c595f6a731c3620f1887f95797f3d9eec05d7ff9c52aed74",
+          "epoch": 4,
+          "location": "scope:t-1|frame:message|seq:4|field:text",
+          "plaintext": "6d657373616765206f662065706f63682034"
+        },
+        {
+          "envelope": "010100010000000000000005f7717ffc048519e82ef0a56a48b15ff6e74220f1636fe633031a8688ee7a41355415f4c1dae5fc3efe22c8b514c631df102ad52000ef561f768e745b7b15aa3b4c9d",
+          "epoch": 5,
+          "location": "scope:t-1|frame:message|seq:5|field:text",
+          "plaintext": "6d657373616765206f662065706f63682035"
+        }
+      ],
+      "current": {
+        "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+        "epoch": 5,
+        "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+      },
+      "description": "from_epoch 3: links for transitions from epoch 3 on",
+      "links": {
+        "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+        "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+      },
+      "policy": {
+        "from_epoch": 3
+      },
+      "scope": "t-1"
+    },
+    {
+      "content": [
+        {
+          "envelope": "0101000100000000000000046f1e847a1db4906721e5eb6c7540cab10ffce5a8f56e1715e3a728a5283d63bffc2feb5aa7614e91ca94c595f6a731c3620f1887f95797f3d9eec05d7ff9c52aed74",
+          "epoch": 4,
+          "error": {
+            "code": "history_unavailable",
+            "epoch": 4
+          },
+          "location": "scope:t-1|frame:message|seq:4|field:text"
+        },
+        {
+          "envelope": "010100010000000000000005f7717ffc048519e82ef0a56a48b15ff6e74220f1636fe633031a8688ee7a41355415f4c1dae5fc3efe22c8b514c631df102ad52000ef561f768e745b7b15aa3b4c9d",
+          "epoch": 5,
+          "location": "scope:t-1|frame:message|seq:5|field:text",
+          "plaintext": "6d657373616765206f662065706f63682035"
+        }
+      ],
+      "current": {
+        "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+        "epoch": 5,
+        "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+      },
+      "description": "from_join: no links",
+      "links": {},
+      "policy": "from_join",
+      "scope": "t-1"
+    },
+    {
+      "content": [
+        {
+          "envelope": "010100010000000000000001e915de1148cc4aef3f22774fd403aa1220657a300aa182b1e906ff20e014b50063ff3cdf8477bd5de137f16768833a4c898c04a81242119d4574e9dab57ba8352862",
+          "epoch": 1,
+          "error": {
+            "code": "history_unavailable",
+            "epoch": 1
+          },
+          "location": "scope:t-1|frame:message|seq:1|field:text"
+        },
+        {
+          "envelope": "010100010000000000000002e88883f0018e6415306e95afd52888365c942dd46dcb39ece2f8682e75259011284df974c2528c7dc43d1d37e57b09d9b76751adc9b64f3a8cd3cf831dc6401f236b",
+          "epoch": 2,
+          "error": {
+            "code": "history_unavailable",
+            "epoch": 2
+          },
+          "location": "scope:t-1|frame:message|seq:2|field:text"
+        },
+        {
+          "envelope": "010100010000000000000003a15d38704d1f519697a001a8bbfe0315ca17a013bb43999a6fdee42d0739d4b22872d648eeced7f498f2b491f2ee741aed7767b87249a8c85cfb619bf77e1b0cf98d",
+          "epoch": 3,
+          "location": "scope:t-1|frame:message|seq:3|field:text",
+          "plaintext": "6d657373616765206f662065706f63682033"
+        },
+        {
+          "envelope": "010100010000000000000005f7717ffc048519e82ef0a56a48b15ff6e74220f1636fe633031a8688ee7a41355415f4c1dae5fc3efe22c8b514c631df102ad52000ef561f768e745b7b15aa3b4c9d",
+          "epoch": 5,
+          "location": "scope:t-1|frame:message|seq:5|field:text",
+          "plaintext": "6d657373616765206f662065706f63682035"
+        }
+      ],
+      "current": {
+        "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+        "epoch": 5,
+        "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+      },
+      "description": "full with the link for epoch 3 missing",
+      "links": {
+        "1": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+        "2": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+        "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+        "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+      },
+      "policy": "full",
+      "scope": "t-1"
+    },
+    {
+      "content": [
+        {
+          "envelope": "010100010000000000000002e88883f0018e6415306e95afd52888365c942dd46dcb39ece2f8682e75259011284df974c2528c7dc43d1d37e57b09d9b76751adc9b64f3a8cd3cf831dc6401f236b",
+          "epoch": 2,
+          "error": {
+            "code": "link_invalid",
+            "epoch": 2
+          },
+          "location": "scope:t-1|frame:message|seq:2|field:text"
+        },
+        {
+          "envelope": "010100010000000000000000dfd52613a3d9ad0c69d94dbc132f1623648c8b14aa46c56ed9ef24c2766e2e50819aa7784b657661b103bf9f45d1311a2ef2b0478fb5b29dc17d2ac1875541522421",
+          "epoch": 0,
+          "error": {
+            "code": "link_invalid",
+            "epoch": 0
+          },
+          "location": "scope:t-1|frame:message|seq:0|field:text"
+        },
+        {
+          "envelope": "010100010000000000000003a15d38704d1f519697a001a8bbfe0315ca17a013bb43999a6fdee42d0739d4b22872d648eeced7f498f2b491f2ee741aed7767b87249a8c85cfb619bf77e1b0cf98d",
+          "epoch": 3,
+          "location": "scope:t-1|frame:message|seq:3|field:text",
+          "plaintext": "6d657373616765206f662065706f63682033"
+        }
+      ],
+      "current": {
+        "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+        "epoch": 5,
+        "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+      },
+      "description": "full with the link for epoch 3 tampered",
+      "links": {
+        "1": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+        "2": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+        "3": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef7",
+        "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+        "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+      },
+      "policy": "full",
+      "scope": "t-1"
+    },
+    {
+      "content": [
+        {
+          "envelope": "010100010000000000000002e88883f0018e6415306e95afd52888365c942dd46dcb39ece2f8682e75259011284df974c2528c7dc43d1d37e57b09d9b76751adc9b64f3a8cd3cf831dc6401f236b",
+          "epoch": 2,
+          "error": {
+            "code": "link_invalid",
+            "epoch": 2
+          },
+          "location": "scope:t-1|frame:message|seq:2|field:text"
+        },
+        {
+          "envelope": "010100010000000000000001e915de1148cc4aef3f22774fd403aa1220657a300aa182b1e906ff20e014b50063ff3cdf8477bd5de137f16768833a4c898c04a81242119d4574e9dab57ba8352862",
+          "epoch": 1,
+          "error": {
+            "code": "link_invalid",
+            "epoch": 1
+          },
+          "location": "scope:t-1|frame:message|seq:1|field:text"
+        },
+        {
+          "envelope": "010100010000000000000003a15d38704d1f519697a001a8bbfe0315ca17a013bb43999a6fdee42d0739d4b22872d648eeced7f498f2b491f2ee741aed7767b87249a8c85cfb619bf77e1b0cf98d",
+          "epoch": 3,
+          "location": "scope:t-1|frame:message|seq:3|field:text",
+          "plaintext": "6d657373616765206f662065706f63682033"
+        }
+      ],
+      "current": {
+        "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+        "epoch": 5,
+        "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+      },
+      "description": "full with the link for epoch 3 carrying wrong secrets",
+      "links": {
+        "1": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+        "2": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+        "3": "0104000100000000000000034d80b21258827da2a4fb6dd551638ba0045fd8d1aed459773e4c82bf6a5c10fa154364dbfa75fba624e2b046c443aa25b0fa7f9cbe6f90dc67dbd0626fb63e42f643aaa86c8502376340b205269408f6669bf672ad7bd3aa4435e7775192ad36bd7b4cf420a11c2b72551b64c2db025f",
+        "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+        "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+      },
+      "policy": "full",
+      "scope": "t-1"
+    }
+  ],
+  "key_history": [
+    {
+      "entries": [
+        {
+          "d": "66af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c26",
+          "epoch": 1,
+          "k": "274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff5"
+        },
+        {
+          "d": "5396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c3799720",
+          "epoch": 3,
+          "k": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1"
+        }
+      ],
+      "epoch": 5,
+      "payload": "010500010000000000000005000000020000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c260000000000000003f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e15396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c3799720",
+      "sealed": {
+        "envelope": "0106000100000000000000050000000349b698c7846ff92ffa10b640f93472cd518af953d74eb9d724a392cd198cde37b2089f6e6e3193098eab894cc6ea69a48c74bdf2cc6d429ca8ed168676908a5b0510b09feca15492c8d2a3e86fd8ef2bf21db661931d501d667493c725db1f57a4126892994e617607eeb66026859a23559246e669b7699d0d08d9b1b456c400941fd6c346c7efc68ac521547d35b98a3a6ab40896007d496658694c9d126d9d7df154701456a9273343341b57cf571486969de79f1d33baeddd26e2d1e1c1aea0e05601",
+        "ikm_e": "1749109bf0e692e153e2e13016c6149c0fae82b700d548cfc1912a973b881339",
+        "leaf_index": 3,
+        "leaf_pk": "f36e947423d4e18505d59109e600eddd912ca561d935b4c495819b05f216156c",
+        "leaf_sk": "d568e14143642ad6a839675151edc9433e23612d3041f027f5bdeb09c80d14f3",
+        "scope": "t-1"
+      }
+    },
+    {
+      "entries": [
+        {
+          "d": "c5d67e59e8e1ef86e9556d73d9b7354c2b16e59b4ef222c7b989687f6fbda481",
+          "epoch": 0,
+          "k": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127"
+        }
+      ],
+      "epoch": 1,
+      "payload": "01050001000000000000000100000001000000000000000061e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127c5d67e59e8e1ef86e9556d73d9b7354c2b16e59b4ef222c7b989687f6fbda481"
+    }
+  ],
+  "negative": [
+    {
+      "description": "a | in a placeholder value",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|thread:{pipe}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "a missing placeholder value",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|thread:{absent}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "an upper-case name",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|Field:text"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "a negative integer",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|seq:{negative}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "a non-integer number",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|seq:{fraction}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "a boolean value",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|flag:{flag}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "an empty value",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|field:"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "a scope part that is not first",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "field:text|scope:{task_id}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "an array placeholder without an element",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|attachment:{data.attachments[].id}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "an array element out of range",
+      "error": {
+        "code": "aad_mismatch"
+      },
+      "input": {
+        "element": 1,
+        "frame": {
+          "data": {
+            "attachments": [
+              {
+                "id": "a-0"
+              }
+            ]
+          },
+          "flag": true,
+          "fraction": 1.5,
+          "negative": -1,
+          "pipe": "a|b",
+          "task_id": "t-1"
+        },
+        "template": "scope:{task_id}|attachment:{data.attachments[].id}"
+      },
+      "section": "aad"
+    },
+    {
+      "description": "an unknown policy byte",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "extension_data": "03"
+      },
+      "section": "policy"
+    },
+    {
+      "description": "from_epoch with a short epoch",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "extension_data": "0100"
+      },
+      "section": "policy"
+    },
+    {
+      "description": "full with a trailing byte",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "extension_data": "0000"
+      },
+      "section": "policy"
+    },
+    {
+      "description": "empty extension data",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "extension_data": ""
+      },
+      "section": "policy"
+    },
+    {
+      "description": "flipped byte in the header epoch",
+      "error": {
+        "code": "open_failed",
+        "epoch": 1
+      },
+      "input": {
+        "envelope": "010100010000000000000001fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "flipped byte in the salt",
+      "error": {
+        "code": "open_failed",
+        "epoch": 0
+      },
+      "input": {
+        "envelope": "010100010000000000000000fabd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "flipped byte in the ciphertext",
+      "error": {
+        "code": "open_failed",
+        "epoch": 0
+      },
+      "input": {
+        "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d92491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "flipped byte in the tag",
+      "error": {
+        "code": "open_failed",
+        "epoch": 0
+      },
+      "input": {
+        "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d7",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "wrong version byte",
+      "error": {
+        "code": "unsupported_version"
+      },
+      "input": {
+        "envelope": "020100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "reserved type 0x00",
+      "error": {
+        "code": "unsupported_version"
+      },
+      "input": {
+        "envelope": "010000010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "unknown type 0x07",
+      "error": {
+        "code": "unsupported_version"
+      },
+      "input": {
+        "envelope": "010700010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "wrong suite 0x0002",
+      "error": {
+        "code": "unsupported_suite"
+      },
+      "input": {
+        "envelope": "010100020000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "drop type where content is expected",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "010300010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "truncated below the minimum length",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "truncated inside the header",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "0101000100000000000000",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "wrong location",
+      "error": {
+        "code": "open_failed",
+        "epoch": 0
+      },
+      "input": {
+        "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-1|frame:message|field:title"
+      },
+      "section": "content"
+    },
+    {
+      "description": "wrong scope in the location",
+      "error": {
+        "code": "open_failed",
+        "epoch": 0
+      },
+      "input": {
+        "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "location": "scope:t-2|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "key of another epoch",
+      "error": {
+        "code": "open_failed",
+        "epoch": 0
+      },
+      "input": {
+        "envelope": "010100010000000000000000fbbd322dd75e707582c218ebc6f961330584bfcb1a1b2ddfa98a7974c696e01d93491448aa03519b1dab8f305d011e5b5f5bad49d6",
+        "k_e": "274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff5",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "invalid UTF-8 after opening a text field",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "010100010000000000000000af27f0b806696e76511773298300e5fb1528188b5770239efbf9c70c8e4e11d7ac7b4464a62903e58a25bbd8affff8994610",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "kind": "text",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "invalid JSON after opening a json field",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "010100010000000000000000af27f0b806696e76511773298300e5fb1528188b5770239efbf9c70c8e4e11d728a7d15fbd66aaf13ad8c9ace604769e61598a8095",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "kind": "json",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "two JSON values after opening a json field",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "010100010000000000000000af27f0b806696e76511773298300e5fb1528188b5770239efbf9c70c8e4e11d762a582f3efc95e02058069464c629e12e058ad",
+        "k_e": "61e880e9f8060fe5cd4de34fee85fc390e173116c40535af6397b2b3fd4ed127",
+        "kind": "json",
+        "location": "scope:t-1|frame:message|field:text"
+      },
+      "section": "content"
+    },
+    {
+      "description": "flipped byte in the tag",
+      "error": {
+        "code": "open_failed",
+        "epoch": 3
+      },
+      "input": {
+        "envelope": "010200010000000000000003f6e34713dd512531ec4560068c187315456b1a4951afb98b3e93ce3af43a57deb16a477d942ed0a79e97ec76048677b1772ed5472515d39fccdece4b306bbe060afae56b1057c748bf4c03f54c7f7d62f4978302ea62268cd1f74f04209e7190d304a7d68332b9de81a7e662d86f6e8c5979015547d36436838fb5787ba8828fd5d51b6ba505c493cb7da54b7ea469ac9d842d8f42cae5789d8189569aeb66eecb387e9ccd405caf1b1e90c55b1bd3b00578685ea8f2a555804afdd70fb011b6829308b7b949c47ae9c1d50c946ca62a20fa5d6d864d0428dd6f705dbd2c542328db63becba9d68c67f47be8de22a5fd17a81105830b6959d0d3cf2ba4a474d1dbab6e415fa4c3c60a74278b533e6bd88245ffc5a673856805b2ad4f2e8e92a8892994add1cd61f278b5d95dafd12dc7",
+        "k_e": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "location": "scope:t-1|frame:output|attachment:a-1|field:bytes"
+      },
+      "section": "file"
+    },
+    {
+      "description": "content type where a file is expected",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "010100010000000000000003f6e34713dd512531ec4560068c187315456b1a4951afb98b3e93ce3af43a57deb16a477d942ed0a79e97ec76048677b1772ed5472515d39fccdece4b306bbe060afae56b1057c748bf4c03f54c7f7d62f4978302ea62268cd1f74f04209e7190d304a7d68332b9de81a7e662d86f6e8c5979015547d36436838fb5787ba8828fd5d51b6ba505c493cb7da54b7ea469ac9d842d8f42cae5789d8189569aeb66eecb387e9ccd405caf1b1e90c55b1bd3b00578685ea8f2a555804afdd70fb011b6829308b7b949c47ae9c1d50c946ca62a20fa5d6d864d0428dd6f705dbd2c542328db63becba9d68c67f47be8de22a5fd17a81105830b6959d0d3cf2ba4a474d1dbab6e415fa4c3c60a74278b533e6bd88245ffc5a673856805b2ad4f2e8e92a8892994add1cd61f278b5d95dafd12dc6",
+        "k_e": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "location": "scope:t-1|frame:output|attachment:a-1|field:bytes"
+      },
+      "section": "file"
+    },
+    {
+      "description": "wrong location",
+      "error": {
+        "code": "open_failed",
+        "epoch": 2
+      },
+      "input": {
+        "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+        "envelope": "010300010000000000000002f8d7e35e85f23c097e2d5cdc2d7e81e4cb42a34a9ee4863771b41dafed5e1e593aa95ed7173b4e40f93f1e73fba3bf83ebcee7615791378fc6334d3b3bac8f7a0086186792b1",
+        "location": "scope:t-1|frame:inbound|field:subject"
+      },
+      "section": "drop"
+    },
+    {
+      "description": "seed of another epoch",
+      "error": {
+        "code": "open_failed",
+        "epoch": 2
+      },
+      "input": {
+        "d_e": "5396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c3799720",
+        "envelope": "010300010000000000000002f8d7e35e85f23c097e2d5cdc2d7e81e4cb42a34a9ee4863771b41dafed5e1e593aa95ed7173b4e40f93f1e73fba3bf83ebcee7615791378fc6334d3b3bac8f7a0086186792b1",
+        "location": "scope:t-1|frame:inbound|field:body"
+      },
+      "section": "drop"
+    },
+    {
+      "description": "flipped byte in enc",
+      "error": {
+        "code": "open_failed",
+        "epoch": 2
+      },
+      "input": {
+        "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+        "envelope": "010300010000000000000002f9d7e35e85f23c097e2d5cdc2d7e81e4cb42a34a9ee4863771b41dafed5e1e593aa95ed7173b4e40f93f1e73fba3bf83ebcee7615791378fc6334d3b3bac8f7a0086186792b1",
+        "location": "scope:t-1|frame:inbound|field:body"
+      },
+      "section": "drop"
+    },
+    {
+      "description": "flipped byte in the tag",
+      "error": {
+        "code": "open_failed",
+        "epoch": 2
+      },
+      "input": {
+        "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+        "envelope": "010300010000000000000002f8d7e35e85f23c097e2d5cdc2d7e81e4cb42a34a9ee4863771b41dafed5e1e593aa95ed7173b4e40f93f1e73fba3bf83ebcee7615791378fc6334d3b3bac8f7a0086186792b0",
+        "location": "scope:t-1|frame:inbound|field:body"
+      },
+      "section": "drop"
+    },
+    {
+      "description": "truncated below the minimum length",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+        "envelope": "010300010000000000000002f8d7e35e85f23c097e2d5cdc2d7e81e4cb42a34a9ee4863771b41dafed5e1e593aa95ed7173b4e40f93f1e73fba3bf",
+        "location": "scope:t-1|frame:inbound|field:body"
+      },
+      "section": "drop"
+    },
+    {
+      "description": "logged drop public key differs from the derived one",
+      "error": {
+        "code": "drop_key_mismatch",
+        "epoch": 2
+      },
+      "input": {
+        "d_e": "a3bc9c3726de0fa511af8397e938a2c503a458cf5cc58d547921ddcef1e3e0f1",
+        "epoch": 2,
+        "public_key": "4abacb1425fc0e6b7581608815d4aa10ae1d63d5c29db289f14c994cc16c9053"
+      },
+      "section": "drop_key"
+    },
+    {
+      "description": "flipped byte in the tag",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef7",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "flipped byte in the salt",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400010000000000000003c94f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "one byte too long",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef600",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "truncated",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01e",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "wrong scope",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-2"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "wrong next key",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "epoch": 2,
+        "k_next": "18383946b324317a549364465d326e30d9423a1ff5d490d20c7797465eafb24b",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "link of another epoch",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 3
+      },
+      "input": {
+        "envelope": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "epoch": 3,
+        "k_next": "18383946b324317a549364465d326e30d9423a1ff5d490d20c7797465eafb24b",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "content type instead of epoch_link",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010100010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "wrong suite",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 2
+      },
+      "input": {
+        "envelope": "010400020000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef6",
+        "epoch": 2,
+        "k_next": "f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e1",
+        "scope": "t-1"
+      },
+      "section": "epoch_link"
+    },
+    {
+      "description": "count zero",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "payload": "01050001000000000000000500000000"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "count above the entries present",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "payload": "010500010000000000000005000000020000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c26"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "truncated entry",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "payload": "010500010000000000000005000000020000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c260000000000000003f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e15396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c37997"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "epochs not increasing",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 5
+      },
+      "input": {
+        "payload": "010500010000000000000005000000020000000000000003f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e15396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c37997200000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c26"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "repeated epoch",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 5
+      },
+      "input": {
+        "payload": "010500010000000000000005000000020000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c260000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c26"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "entry not below the message epoch",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 5
+      },
+      "input": {
+        "payload": "01050001000000000000000500000001000000000000000502c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a941a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "sealed type where the payload is expected",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "payload": "010600010000000000000005000000020000000000000001274597fd5e11c1fca69f70d17d2c06f7db3b811c5e43dd530af473854d3f2ff566af0771dafe0af1e6f5669ad7bc1bea5535f7dc4eeb4ad7ac021ad716a37c260000000000000003f7a27fbd9c08b03d522b6043769bc0e57f4459a1f9edfbf44c1cf1db6a8d27e15396d250517084372a7b4d5b768a73629f29cffd6af7b237a2c9bd61c3799720"
+      },
+      "section": "key_history"
+    },
+    {
+      "description": "another leaf's private key",
+      "error": {
+        "code": "open_failed",
+        "epoch": 5
+      },
+      "input": {
+        "envelope": "0106000100000000000000050000000349b698c7846ff92ffa10b640f93472cd518af953d74eb9d724a392cd198cde37b2089f6e6e3193098eab894cc6ea69a48c74bdf2cc6d429ca8ed168676908a5b0510b09feca15492c8d2a3e86fd8ef2bf21db661931d501d667493c725db1f57a4126892994e617607eeb66026859a23559246e669b7699d0d08d9b1b456c400941fd6c346c7efc68ac521547d35b98a3a6ab40896007d496658694c9d126d9d7df154701456a9273343341b57cf571486969de79f1d33baeddd26e2d1e1c1aea0e05601",
+        "leaf_index": 3,
+        "leaf_sk": "ef39387c9ba327d16b00fa10c32cf3e0d05f05219705cdc5244e91595dd2b885",
+        "scope": "t-1"
+      },
+      "section": "key_history_sealed"
+    },
+    {
+      "description": "wrong scope",
+      "error": {
+        "code": "open_failed",
+        "epoch": 5
+      },
+      "input": {
+        "envelope": "0106000100000000000000050000000349b698c7846ff92ffa10b640f93472cd518af953d74eb9d724a392cd198cde37b2089f6e6e3193098eab894cc6ea69a48c74bdf2cc6d429ca8ed168676908a5b0510b09feca15492c8d2a3e86fd8ef2bf21db661931d501d667493c725db1f57a4126892994e617607eeb66026859a23559246e669b7699d0d08d9b1b456c400941fd6c346c7efc68ac521547d35b98a3a6ab40896007d496658694c9d126d9d7df154701456a9273343341b57cf571486969de79f1d33baeddd26e2d1e1c1aea0e05601",
+        "leaf_index": 3,
+        "leaf_sk": "d568e14143642ad6a839675151edc9433e23612d3041f027f5bdeb09c80d14f3",
+        "scope": "t-2"
+      },
+      "section": "key_history_sealed"
+    },
+    {
+      "description": "addressed to another leaf index",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "envelope": "0106000100000000000000050000000349b698c7846ff92ffa10b640f93472cd518af953d74eb9d724a392cd198cde37b2089f6e6e3193098eab894cc6ea69a48c74bdf2cc6d429ca8ed168676908a5b0510b09feca15492c8d2a3e86fd8ef2bf21db661931d501d667493c725db1f57a4126892994e617607eeb66026859a23559246e669b7699d0d08d9b1b456c400941fd6c346c7efc68ac521547d35b98a3a6ab40896007d496658694c9d126d9d7df154701456a9273343341b57cf571486969de79f1d33baeddd26e2d1e1c1aea0e05601",
+        "leaf_index": 4,
+        "leaf_sk": "d568e14143642ad6a839675151edc9433e23612d3041f027f5bdeb09c80d14f3",
+        "scope": "t-1"
+      },
+      "section": "key_history_sealed"
+    },
+    {
+      "description": "flipped byte in the leaf index",
+      "error": {
+        "code": "open_failed",
+        "epoch": 5
+      },
+      "input": {
+        "envelope": "0106000100000000000000050000000249b698c7846ff92ffa10b640f93472cd518af953d74eb9d724a392cd198cde37b2089f6e6e3193098eab894cc6ea69a48c74bdf2cc6d429ca8ed168676908a5b0510b09feca15492c8d2a3e86fd8ef2bf21db661931d501d667493c725db1f57a4126892994e617607eeb66026859a23559246e669b7699d0d08d9b1b456c400941fd6c346c7efc68ac521547d35b98a3a6ab40896007d496658694c9d126d9d7df154701456a9273343341b57cf571486969de79f1d33baeddd26e2d1e1c1aea0e05601",
+        "leaf_index": 2,
+        "leaf_sk": "d568e14143642ad6a839675151edc9433e23612d3041f027f5bdeb09c80d14f3",
+        "scope": "t-1"
+      },
+      "section": "key_history_sealed"
+    },
+    {
+      "description": "full with the link for epoch 3 missing",
+      "error": {
+        "code": "history_unavailable",
+        "epoch": 2
+      },
+      "input": {
+        "current": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "epoch": 5,
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        },
+        "envelope": "010100010000000000000002e88883f0018e6415306e95afd52888365c942dd46dcb39ece2f8682e75259011284df974c2528c7dc43d1d37e57b09d9b76751adc9b64f3a8cd3cf831dc6401f236b",
+        "links": {
+          "1": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+          "2": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+          "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+          "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+        },
+        "location": "scope:t-1|frame:message|seq:2|field:text",
+        "scope": "t-1"
+      },
+      "section": "history_walk"
+    },
+    {
+      "description": "full with the link for epoch 3 tampered",
+      "error": {
+        "code": "link_invalid",
+        "epoch": 0
+      },
+      "input": {
+        "current": {
+          "d": "1a709543353b7e872b42efe0599401b230d390b9976ce574818fdaf68120fb1d",
+          "epoch": 5,
+          "k": "02c1bf994124c9d6c9fa449a51a28a8c5bd80a3e268191a4fef8bd14984e2a94"
+        },
+        "envelope": "010100010000000000000000dfd52613a3d9ad0c69d94dbc132f1623648c8b14aa46c56ed9ef24c2766e2e50819aa7784b657661b103bf9f45d1311a2ef2b0478fb5b29dc17d2ac1875541522421",
+        "links": {
+          "1": "0104000100000000000000012adab12c04239fbb3f81ff5acc151baaba7928dc96291b91ffbed376f228f62cc78f4a583a31da891ec621ca5ace17771258e957b8c486aa3c492aa7f3c3a9c68c91c0700b4ae9d666315e83d8a6bc0b6f6e3b15c08ab9ad97b9d357b44112ef7210fb9f4730db74b767f406edaa036a",
+          "2": "01040001000000000000000297c547271bec007849bac10cfb2bf986ec5485a32d51cb2fc5aba16514e865f16deaf82ce3beacb7f2f742a518d847e0743b6be36468b973866e11e2c478c16dc07f706aaa945fbff6062d7ffac6899e4c59544de96fda7f16dfcb9b2058cf53c0fc8dd0b505401c79d475af98c24293",
+          "3": "010400010000000000000003c84f8ae2c3bd5a6dcce14cb1cedebdef32d54451cbe95df2c69fc6de2670358a6cc9023882538f959fb36bc9b8e276edcb46c4f6410f193d2a1cc10e44156c852668b129cead76365f742862ac8bf60b0466b60ad6765334782d688fbb8a0650614e71a3ccdabf91dca1123508f01ef7",
+          "4": "010400010000000000000004bf550ef8d585ade9a1231ba8f4551d4a5da36665a7a3ed693786e3a3827dbf7aaa1f3c0b2fe3fe7aba8654cf2d862448c5fc9c427aa30be1aeeb5a862644a928bf2226a147c2bf1b3afb21706c9a65dbc5789e87f96421b1ead27b08fbabfe35ad7d7d2e5b11c987379bd7a9df4c8e47",
+          "5": "01040001000000000000000592b4dda48f0ecf16df6bf7f319fddc2380a6cdabd231242e21c9760afb9a3b112a0c8976322361db15674b9baedab68dc13b41b52bff310accc586f26ac5ff13d4f75716f9d20f20401b7eb8a34e15d800becc0d5ec8d91c6c9b2916babc4c19ebae21420264ae946b2f2da529a0d97b"
+        },
+        "location": "scope:t-1|frame:message|seq:0|field:text",
+        "scope": "t-1"
+      },
+      "section": "history_walk"
+    },
+    {
+      "description": "padding",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "text": "AQ=="
+      },
+      "section": "base64url"
+    },
+    {
+      "description": "non-zero trailing bits",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "text": "AR"
+      },
+      "section": "base64url"
+    },
+    {
+      "description": "whitespace",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "text": "AQ "
+      },
+      "section": "base64url"
+    },
+    {
+      "description": "standard-alphabet characters",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "text": "+/8"
+      },
+      "section": "base64url"
+    },
+    {
+      "description": "impossible length",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "text": "AQIDB"
+      },
+      "section": "base64url"
+    },
+    {
+      "description": "plaintext string in a mapped field",
+      "error": {
+        "code": "plaintext_rejected"
+      },
+      "input": {
+        "value": "hello"
+      },
+      "section": "sealed_form"
+    },
+    {
+      "description": "plaintext object in a mapped field",
+      "error": {
+        "code": "plaintext_rejected"
+      },
+      "input": {
+        "value": {
+          "text": "hello"
+        }
+      },
+      "section": "sealed_form"
+    },
+    {
+      "description": "sealed form with extra members",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "value": {
+          "e2ee": "AQID",
+          "kind": "text"
+        }
+      },
+      "section": "sealed_form"
+    },
+    {
+      "description": "sealed form with a non-string e2ee",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "value": {
+          "e2ee": 1
+        }
+      },
+      "section": "sealed_form"
+    },
+    {
+      "description": "sealed form with padded base64url",
+      "error": {
+        "code": "malformed"
+      },
+      "input": {
+        "value": {
+          "e2ee": "AQ=="
+        }
+      },
+      "section": "sealed_form"
+    }
+  ],
+  "policy": [
+    {
+      "extension_data": "00",
+      "policy": "full"
+    },
+    {
+      "extension_data": "010000000000000003",
+      "policy": {
+        "from_epoch": 3
+      }
+    },
+    {
+      "extension_data": "02",
+      "policy": "from_join"
+    }
+  ],
+  "suite": 1
+}

@@ -1,0 +1,13 @@
+[files]
+extend-exclude = ["target/"]
+
+[default.extend-words]
+# "unparseable" is an accepted spelling used in identifiers; "reacked" is re-acked.
+unparseable = "unparseable"
+reacked = "reacked"
+# Crate name (hax-lib-macros) in deny.toml.
+hax = "hax"
+
+[default.extend-identifiers]
+# The inheritable capability set field of /proc/self/status.
+CapInh = "CapInh"

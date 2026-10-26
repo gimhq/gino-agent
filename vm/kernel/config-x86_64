@@ -1,0 +1,195 @@
+# Guest kernel config fragment for x86_64 KVM guests under libkrun.
+# Applied over `make tinyconfig` with scripts/kconfig/merge_config.sh, then
+# `make olddefconfig` (see build.sh). Every line here must survive into the final
+# .config; build.sh fails otherwise.
+
+# Base
+CONFIG_64BIT=y
+CONFIG_SMP=y
+CONFIG_NR_CPUS=64
+CONFIG_LOCALVERSION="-gino"
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+CONFIG_EXPERT=y
+CONFIG_PRINTK=y
+CONFIG_BUG=y
+CONFIG_KALLSYMS=y
+CONFIG_MULTIUSER=y
+CONFIG_SYSVIPC=y
+CONFIG_POSIX_MQUEUE=y
+CONFIG_FHANDLE=y
+CONFIG_POSIX_TIMERS=y
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_EVENTFD=y
+CONFIG_SHMEM=y
+CONFIG_AIO=y
+CONFIG_IO_URING=y
+CONFIG_ADVISE_SYSCALLS=y
+CONFIG_MEMBARRIER=y
+CONFIG_RSEQ=y
+CONFIG_NO_HZ_IDLE=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_BINFMT_ELF=y
+CONFIG_BINFMT_SCRIPT=y
+# CONFIG_MODULES is not set
+
+# KVM guest platform (libkrun describes the machine with an MP table, no ACPI)
+CONFIG_HYPERVISOR_GUEST=y
+CONFIG_PARAVIRT=y
+CONFIG_PARAVIRT_SPINLOCKS=y
+CONFIG_KVM_GUEST=y
+CONFIG_PVH=y
+CONFIG_X86_MPPARSE=y
+CONFIG_X86_LOCAL_APIC=y
+CONFIG_X86_IO_APIC=y
+# CONFIG_ACPI is not set
+CONFIG_PCI=y
+CONFIG_PCI_MSI=y
+# CONFIG_PCIEASPM is not set
+# CONFIG_VGA_ARB is not set
+# Only Intel and AMD hosts run KVM guests here.
+CONFIG_PROCESSOR_SELECT=y
+# CONFIG_CPU_SUP_CENTAUR is not set
+# CONFIG_CPU_SUP_ZHAOXIN is not set
+# CONFIG_CPU_SUP_HYGON is not set
+# The host owns frequency scaling, core priorities (ITMT) and the PMU's package counters.
+# CONFIG_SCHED_MC_PRIO is not set
+# CONFIG_CPU_FREQ is not set
+# CONFIG_X86_INTEL_PSTATE is not set
+# CONFIG_PERF_EVENTS_INTEL_UNCORE is not set
+# CONFIG_PERF_EVENTS_INTEL_RAPL is not set
+# CONFIG_PERF_EVENTS_INTEL_CSTATE is not set
+
+# Isolation features for the engine user
+CONFIG_CGROUPS=y
+CONFIG_NAMESPACES=y
+CONFIG_UTS_NS=y
+CONFIG_IPC_NS=y
+CONFIG_USER_NS=y
+CONFIG_PID_NS=y
+CONFIG_NET_NS=y
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+CONFIG_KEYS=y
+
+# cgroup v2 controllers (Docker, runc)
+CONFIG_MEMCG=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_CGROUP_SCHED=y
+CONFIG_FAIR_GROUP_SCHED=y
+CONFIG_CPUSETS=y
+CONFIG_CGROUP_FREEZER=y
+CONFIG_CGROUP_DEVICE=y
+CONFIG_CGROUP_CPUACCT=y
+CONFIG_BLK_CGROUP=y
+CONFIG_BPF_SYSCALL=y
+CONFIG_CGROUP_BPF=y
+
+# Virtio transports and devices
+CONFIG_VIRTIO_MENU=y
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_VIRTIO_MMIO_CMDLINE_DEVICES=y
+CONFIG_VIRTIO_PCI=y
+CONFIG_VIRTIO_BALLOON=y
+CONFIG_HW_RANDOM=y
+CONFIG_HW_RANDOM_VIRTIO=y
+
+# Consoles: virtio-console (hvc0, the libkrun default) and the legacy serial port
+CONFIG_TTY=y
+CONFIG_UNIX98_PTYS=y
+CONFIG_VIRTIO_CONSOLE=y
+CONFIG_HVC_DRIVER=y
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+# CONFIG_SERIAL_8250_PCI is not set
+# CONFIG_SERIAL_8250_EXAR is not set
+# CONFIG_SERIAL_8250_LPSS is not set
+# CONFIG_SERIAL_8250_MID is not set
+# CONFIG_SERIAL_8250_PERICOM is not set
+# hvc0 registers only after the host answers the virtio-console handshake, which can
+# be after the kernel opens /dev/console for init; init then starts without stdio
+# fds. The built-in console=ttynull (prepended to libkrun's command line, whose
+# console=hvc0 stays the preferred console) makes that open always succeed.
+CONFIG_NULL_TTY=y
+CONFIG_CMDLINE_BOOL=y
+CONFIG_CMDLINE="console=ttynull"
+# CONFIG_VT is not set
+# CONFIG_INPUT is not set
+
+# Networking: unix sockets, IPv4/IPv6, vsock, virtio-net
+CONFIG_NET=y
+CONFIG_UNIX=y
+CONFIG_PACKET=y
+CONFIG_INET=y
+CONFIG_IPV6=y
+# CONFIG_IPV6_SIT is not set
+CONFIG_VSOCKETS=y
+CONFIG_VIRTIO_VSOCKETS=y
+CONFIG_NETDEVICES=y
+CONFIG_NET_CORE=y
+CONFIG_VIRTIO_NET=y
+
+# Container networking: veth pairs on a bridge, NAT through iptables-nft
+CONFIG_VETH=y
+CONFIG_BRIDGE=y
+CONFIG_TUN=y
+CONFIG_NETFILTER=y
+CONFIG_NETFILTER_ADVANCED=y
+CONFIG_BRIDGE_NETFILTER=y
+CONFIG_NF_CONNTRACK=y
+CONFIG_NF_NAT=y
+CONFIG_NF_TABLES=y
+CONFIG_NF_TABLES_INET=y
+CONFIG_NF_TABLES_IPV4=y
+CONFIG_NF_TABLES_IPV6=y
+CONFIG_NFT_CT=y
+CONFIG_NFT_NAT=y
+CONFIG_NFT_MASQ=y
+CONFIG_NFT_COMPAT=y
+CONFIG_NETFILTER_XTABLES=y
+CONFIG_NETFILTER_XT_MARK=y
+CONFIG_NETFILTER_XT_NAT=y
+CONFIG_NETFILTER_XT_TARGET_MASQUERADE=y
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+CONFIG_NETFILTER_XT_MATCH_COMMENT=y
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+CONFIG_NETFILTER_XT_MATCH_MULTIPORT=y
+
+# Filesystems: the virtiofs boot root, the ext4 root disk on virtio-blk, overlayfs
+# (Docker overlay2), pseudo filesystems. libkrun passes no root=; the kernel mounts the
+# boot root through the block-root path with the device name "/dev/root", which libkrun
+# uses as the virtiofs tag.
+CONFIG_BLOCK=y
+CONFIG_BLK_DEV=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_PARTITION_ADVANCED=y
+# CONFIG_MSDOS_PARTITION is not set
+# CONFIG_EFI_PARTITION is not set
+# CONFIG_MQ_IOSCHED_DEADLINE is not set
+# CONFIG_MQ_IOSCHED_KYBER is not set
+CONFIG_EXT4_FS=y
+CONFIG_EXT4_FS_POSIX_ACL=y
+CONFIG_EXT4_FS_SECURITY=y
+CONFIG_FUSE_FS=y
+CONFIG_VIRTIO_FS=y
+CONFIG_OVERLAY_FS=y
+CONFIG_TMPFS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_PROC_FS=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_SYSFS=y
+CONFIG_FILE_LOCKING=y
+CONFIG_INOTIFY_USER=y
+
+# Off
+# CONFIG_SWAP is not set
+# CONFIG_INTEL_MEI is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_SOUND is not set
+# CONFIG_DRM is not set
+# CONFIG_WIRELESS is not set
+# CONFIG_WLAN is not set

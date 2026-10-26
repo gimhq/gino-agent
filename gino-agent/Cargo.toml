@@ -1,0 +1,141 @@
+[package]
+name = "gino-agent"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96.0"
+description = "Generic WebSocket-based, runtime-agnostic agent runner daemon for the gino orchestrator."
+license = "Apache-2.0"
+repository = "https://github.com/gimhq/gino"
+publish = false
+
+# TLS: every client uses rustls with the aws-lc-rs provider (the only provider
+# compiled in) and verifies against the OS trust store — reqwest through
+# `rustls-platform-verifier`, the WebSocket through `rustls-native-certs`.
+# deny.toml bans openssl/native-tls.
+[dependencies]
+anyhow = "1"
+# Object-safe async trait methods for the `Engine`/`Session` abstraction.
+async-trait = "0.1"
+# Terminal byte frames.
+base64 = "0.23"
+# RFC3339 timestamps and interval arithmetic for the scheduler.
+chrono = { version = "0.4.45", default-features = false, features = ["now"] }
+clap = { version = "4", features = ["derive", "env"] }
+# End-to-end encryption core: identity, KeyPackages, MLS groups and envelopes.
+gino-e2ee = { path = "../gino-e2ee" }
+# 5-field cron next-run computation. PINNED: 3.x pulls a proc-macro tree the
+# scheduler does not need.
+croner = "2"
+# Stream/Sink combinators for the split WebSocket connection.
+futures-util = { version = "0.3", default-features = false, features = ["std", "sink"] }
+# SIGINT to the `codex exec` child, which has no in-band cancel channel, the
+# nested user-namespace drop in `sandbox-init`, mounts, vsock and reaping in
+# `guest-init`, and the symlink-safe conversations snapshot.
+nix = { version = "0.31", default-features = false, features = ["dir", "fs", "mount", "process", "sched", "signal", "socket", "term", "user"] }
+# The OpenMLS provider (OS-seeded CSPRNG, AES-256-GCM) for the e2ee key files
+# and at-rest sealing; the exact versions gino-e2ee pins.
+openmls_rust_crypto = "=0.6.0"
+openmls_traits = "=0.6.0"
+# Packet source/sink traits and the pump between the guest TUN and the exit stack.
+nsplane = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+# Guest DNS: wire codec, the `Resolver` trait and the fake-address pool.
+nsplane-dns = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3", features = ["netstack"] }
+# Ethernet framing (ARP, gateway MAC) between a VM's virtio-net stream and the exit.
+nsplane-ether = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+# User-space TCP/IP stack terminating the guest's traffic in the per-run exit.
+nsplane-netstack = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+# TUN device creation (TUNSETIFF) without unsafe code in this crate.
+nsplane-tun = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+# Async pseudo-terminal allocation and process spawning.
+pty-process = { version = "0.5.3", features = ["async"] }
+# HTTP client for register, config refresh and the output fallback. Default
+# features are off because they enable native-tls.
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
+# `bundled` compiles the vendored SQLite, so no system libsqlite3 is needed.
+rusqlite = { version = "0.37", features = ["bundled"] }
+# Address, link and route configuration of the TUN device over rtnetlink.
+rtnetlink = "0.23"
+# Safe sendmsg/recvmsg with SCM_RIGHTS for passing the TUN fd between processes,
+# and capability clearing in `sandbox-init` (nix has no capset wrapper).
+rustix = { version = "1.1.5", features = ["net", "thread"] }
+# RLIMIT_CORE = 0 at startup: a core dump would carry the connect token.
+rlimit = "0.11"
+# Direct dependency so the aws-lc-rs `CryptoProvider` can be installed at startup.
+rustls = "0.23"
+secrecy = "0.10"
+serde = { version = "1", features = ["derive"] }
+# Attachment integrity and the content-addressed cache key.
+sha2 = "0.10"
+# qcow2 overlays of the VM root disk (the format libkrun's block device reads).
+imago = { version = "0.2.6", features = ["sync-wrappers"] }
+serde_json = "1"
+# Uncompressed tar (un)pack of `kind=dir` skill bundles; `xattr` support is off.
+tar = { version = "0.4", default-features = false }
+thiserror = "2"
+# `process` drives the engine child; `signal` powers clean shutdown.
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "time",
+    "io-util",
+    "net",
+    "process",
+    "signal",
+] }
+# Reconnecting WebSocket client.
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Session and request ids for the engine control protocol.
+uuid = { version = "1", features = ["v4"] }
+# Monotonic ULID delivery ids for outbox rows.
+ulid = "3"
+
+[dev-dependencies]
+# Temp-file SQLite DB for the identity persist/reload test (in-memory DBs cannot
+# survive a reopen).
+tempfile = "3"
+# Mock HTTP host for the register / config-refresh integration tests (no network).
+wiremock = "0.6"
+
+# `release` keeps unwinding so panics carry backtraces; `dist` is the shipped
+# binary: size-tuned, aborting on panic after the hook has logged it.
+[profile.release]
+panic = "unwind"
+
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# Lint policy lives in the manifest so dev and CI share one gate; `cargo clippy`
+# is invoked without extra flags.
+[lints.rust]
+unsafe_code = "forbid"
+# Deny every warn-by-default lint (current + future toolchains). priority -2 lets
+# the clippy groups below (priority -1) and named lints (priority 0) override it.
+warnings = { level = "deny", priority = -2 }
+missing_debug_implementations = "warn"
+elided_lifetimes_in_paths = "warn"
+
+[lints.clippy]
+# Promote the high-signal, stable pedantic group. `nursery` and `cargo` are left
+# off: `nursery` is explicitly unstable (its `unreachable_pub`/`redundant_pub_crate`
+# pair conflict inside a binary crate) and `cargo` only checks crates.io publishing
+# metadata, which is irrelevant for this unpublished binary.
+pedantic = { level = "warn", priority = -1 }
+# No panics in runtime paths (relaxed in tests via clippy.toml).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+dbg_macro = "deny"
+todo = "warn"
+# Pedantic lints with poor signal-to-noise for this crate.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+doc_markdown = "allow"

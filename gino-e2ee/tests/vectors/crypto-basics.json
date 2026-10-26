@@ -1,0 +1,45 @@
+[
+  {
+    "cipher_suite": 1,
+    "derive_secret": {
+      "label": "DeriveSecret",
+      "out": "3b08c195a246c4ad469c1d11c10e62890d8fa6b684494ff925409efdb1ff0464",
+      "secret": "1a9ce178a53f8752d2513c27efe9c85133f6c0a97f7b35ac200695024a77228e"
+    },
+    "derive_tree_secret": {
+      "generation": 2694881440,
+      "label": "DeriveTreeSecret",
+      "length": 32,
+      "out": "8461f3ccc603eae52149a23a4134d29c880a1ad1ba70441e5d586e3521ec7b25",
+      "secret": "5133c6f8bad297f5d3beacdf477f0c45ec51b02de659d305220c5f9385c6eb43"
+    },
+    "encrypt_with_label": {
+      "ciphertext": "15c80ea2bc37db221baa530ef5aea88650f0ce0f262803d6f78f3a1392f7ccd960eff94ca081ee54efa4c3acfa0eb591",
+      "context": "26347dd7f218d1de8673d6a66646ce06ac5fd3aa8d5c33f65d86aeefdcf4a31e",
+      "kem_output": "0a144e8fbf2d6dcf6fe9d2e2b8aeca5461ff5b0ea9c0ede1040c3dc7ed1dfd1c",
+      "label": "EncryptWithLabel",
+      "plaintext": "8f55dd30f03d64335c22b53ea7670bb1becf49b04021f706368fe93eeb358f46",
+      "priv": "fb1ade7939987ff12a9d620772b1f9f7caeba26f8a3ecea9617d9402cd862444",
+      "pub": "ecea6564da58d6c6cff6c733bd4ae0815b1f60bb911b73e4ef1d06263ec4ce58"
+    },
+    "expand_with_label": {
+      "context": "2ff8c1f9d9c1248f82e372ddb5791c771695e01882abca6a64097bd2f04c971f",
+      "label": "ExpandWithLabel",
+      "length": 16,
+      "out": "c1e8eb360391526c0c64039f13e0c5b1",
+      "secret": "1499360a561335f4ef51d0a1b0d586900dc8007ae405b1ab79bf4207bb3d67e4"
+    },
+    "ref_hash": {
+      "label": "RefHash",
+      "out": "e8027fffc5f9bb469f29172538dc0f3a78f14f323495bbd2217eba7a77fb242a",
+      "value": "40312db83f651883c05ab26fa12c6af61930015c81947cfd0f129e6d99210bb2"
+    },
+    "sign_with_label": {
+      "content": "cd289cc7ba2869f64f3c32ffd133f500d17abace919a5ffe7faa974200d81932",
+      "label": "SignWithLabel",
+      "priv": "a2f640dd5005fcad6adb8e9bd8b60d70946bb802e1e788307929fdac81e1ec74",
+      "pub": "85600e54e5c2919ccbd0742126e5d837cf7a2ba50d75a69b3f35dcfe4a50ffe2",
+      "signature": "996bd223ddb4d55a2b57d85cb2944f21facc95696053ddf66d590060fdc719f4a26c6212ce605414e0d5e66a55921dd99d11122218c35bc23408b0076e8bc40b"
+    }
+  }
+]

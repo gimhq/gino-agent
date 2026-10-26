@@ -1,0 +1,33 @@
+[package]
+name = "vm-spike"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+description = "Throwaway libkrun spike: VMM launcher, host-side services and guest probe"
+
+[workspace]
+
+[[bin]]
+name = "spike-vmm"
+path = "src/vmm.rs"
+
+[[bin]]
+name = "spike-host"
+path = "src/host.rs"
+
+[[bin]]
+name = "spike-guest"
+path = "src/guest.rs"
+
+[dependencies]
+futures-core = "0.3.32"
+libc = "0.2"
+libloading = "0.8"
+nsplane = { version = "0.19.0", git = "https://github.com/dotns/nsplane", tag = "v0.19.0" }
+nsplane-ether = { version = "0.19.0", git = "https://github.com/dotns/nsplane", tag = "v0.19.0" }
+nsplane-netstack = { version = "0.19.0", git = "https://github.com/dotns/nsplane", tag = "v0.19.0" }
+tokio = { version = "1.53.1", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "signal", "sync", "time"] }
+
+[profile.release]
+debug = false

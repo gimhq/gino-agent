@@ -1,0 +1,152 @@
+name: release
+
+# Builds and uploads the agent release asset to an EXISTING GitHub Release.
+# Publishing the release is the source of truth (not a tag push), which avoids
+# building against a tag/release mismatch. The agent static binary is packed as a
+# tar.gz and attached to the release; lode (github source) reads it by filename.
+#
+# The build job only produces the artifact; `publish` signs and uploads it. The
+# signing key never reaches a job that runs dependency code (cargo build scripts):
+# with the repository secret LODE_SIGNING_KEY (an ed25519 seed from
+# `lode-cli keygen`) `publish` writes a `<asset>.sig` sidecar; without it the asset
+# uploads unsigned.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)build assets for, e.g. v0.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  AGENT_APP: gino-agent
+  AGENT_ASSET: gino-agent-linux-x64.tar.gz
+  LODE_VERSION: v0.2.1
+  # Untrusted-input-safe: the tag flows through an env var, never inlined into a run/ref.
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  agent:
+    name: agent static binary (musl)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: gino-agent
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: System deps (musl cross + C toolchain)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools musl-dev cmake clang libclang-dev
+
+      - name: Rust toolchain + musl target
+        run: |
+          rustup show
+          rustup target add x86_64-unknown-linux-musl
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-release-${{ hashFiles('gino-agent/Cargo.lock') }}
+
+      # Fully static, non-PIE musl binary, packed as `gino-agent` at the archive root
+      # (lode extracts it into the version dir; `[command].run = "./gino-agent run"`).
+      - name: Build + package (static musl)
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          AR_x86_64_unknown_linux_musl: ar
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          RUSTFLAGS: "-C target-feature=+crt-static -C relocation-model=static"
+        run: |
+          set -euo pipefail
+          cargo build --profile dist --locked --target x86_64-unknown-linux-musl
+          pkg="$(mktemp -d)"
+          install -m 0755 "target/x86_64-unknown-linux-musl/dist/gino-agent" "${pkg}/gino-agent"
+          tar -C "${pkg}" --owner=0 --group=0 --numeric-owner --mtime='@0' -cf - gino-agent | gzip -n -9 > "${AGENT_ASSET}"
+          sha256sum "${AGENT_ASSET}" | tee "${AGENT_ASSET}.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-dist
+          path: |
+            gino-agent/${{ env.AGENT_ASSET }}
+            gino-agent/${{ env.AGENT_ASSET }}.sha256
+          if-no-files-found: error
+
+  # Signs and uploads. Runs no dependency code: only the pinned, sha256-checked
+  # lode-cli and `gh`.
+  publish:
+    name: sign + upload
+    needs: [agent]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve release metadata
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG}"
+          {
+            echo "TAG_NAME=${tag}"
+            echo "RELEASE_VERSION=${tag#v}"
+          } >> "${GITHUB_ENV}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-dist
+          path: agent-dist
+
+      - name: Signing key present?
+        id: key
+        env:
+          LODE_SIGNING_KEY: ${{ secrets.LODE_SIGNING_KEY }}
+        run: echo "present=$([ -n "${LODE_SIGNING_KEY}" ] && echo true || echo false)" >> "${GITHUB_OUTPUT}"
+
+      - name: Install lode-cli
+        if: steps.key.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          gh release download "${LODE_VERSION}" --repo bkhq/lode -p lode-linux-x64.tar.gz -p SHA256SUMS
+          grep ' lode-linux-x64.tar.gz$' SHA256SUMS | sha256sum -c -
+          tar -xzf lode-linux-x64.tar.gz lode lode-cli
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Sign
+        if: steps.key.outputs.present == 'true'
+        env:
+          LODE_SIGNING_KEY: ${{ secrets.LODE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          lode-cli sign "agent-dist/${AGENT_ASSET}" --app "${AGENT_APP}" --version "${RELEASE_VERSION}" --key-env LODE_SIGNING_KEY \
+            | awk '/^sig:/ {print $2}' > "agent-dist/${AGENT_ASSET}.sig"
+          test -s "agent-dist/${AGENT_ASSET}.sig"
+
+      - name: Validate release asset
+        run: (cd agent-dist && sha256sum -c "${AGENT_ASSET}.sha256")
+
+      - name: Upload to the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null
+          shopt -s nullglob
+          gh release upload "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" \
+            "agent-dist/${AGENT_ASSET}" "agent-dist/${AGENT_ASSET}.sha256" agent-dist/*.sig \
+            --clobber

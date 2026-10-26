@@ -1,0 +1,50 @@
+# cargo-deny supply-chain policy for `gino-e2ee`.
+#
+# Security advisories are denied by default.
+
+[advisories]
+# A transiently-yanked transitive crate should not flake CI; real advisories are
+# still denied by default.
+yanked = "warn"
+ignore = [
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 (no fixed 0.5 release) via elliptic-curve 0.13, pulled by the pinned openmls_rust_crypto 0.6.0 for its P-256/P-384/K-256 suites; gino-e2ee uses only suite 0x0001 (X25519/Ed25519), which never reaches crypto-bigint" },
+    { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is unmaintained, no fix; build-time only via hax-lib-macros <- libcrux-sha3 <- hpke-rs 0.7, pulled by the pinned openmls_rust_crypto 0.6.0" },
+]
+
+[licenses]
+# This crate is unpublished (`publish = false`); skip the license check for it.
+private = { ignore = true }
+confidence-threshold = 0.93
+# The allow-list is a permissive superset; unused entries do not warn.
+unused-allowed-license = "allow"
+# Permissive licenses only. Add a new entry only after a deliberate review.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "0BSD",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "Zlib",
+]
+# OpenMLS's HPKE implementation (used unmodified through openmls_rust_crypto
+# 0.6.0); MPL-2.0 is file-level copyleft and imposes nothing on this crate.
+exceptions = [
+    { allow = ["MPL-2.0"], crate = "hpke-rs" },
+    { allow = ["MPL-2.0"], crate = "hpke-rs-crypto" },
+    { allow = ["MPL-2.0"], crate = "hpke-rs-rust-crypto" },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

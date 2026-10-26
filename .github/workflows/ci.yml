@@ -1,0 +1,370 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-flight runs for the same PR; never cancel main pushes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Pin tool versions so a runtime minor bump is a deliberate PR, not a silent
+  # main-branch breakage.
+  BUN_VERSION: "1.4.0"
+
+jobs:
+  agent:
+    name: agent (rust) — fmt + clippy + test + supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: gino-agent
+    steps:
+      - uses: actions/checkout@v6
+
+      # C toolchain for the two crates that compile C — aws-lc-sys (rustls crypto)
+      # and libsqlite3-sys (bundled SQLite).
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake clang libclang-dev
+
+      # rust-toolchain.toml pins the channel (1.96.0) + rustfmt/clippy components.
+      - name: Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-agent/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('gino-agent/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      # Prebuilt binaries, pinned versions — reproducible and fast (no compile).
+      - name: Install cargo tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.19.8,cargo-shear@1.13.1,cargo-nextest@0.9.149,cargo-hack@0.6.45,typos@1.51.1
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --release --locked --all-targets
+
+      - name: Typos
+        run: typos
+
+      # Builds against the declared `rust-version` (Cargo.toml) — the MSRV gate.
+      - name: MSRV
+        run: cargo hack check --rust-version --locked
+
+      - name: Test
+        run: cargo nextest run --release --locked
+
+      - name: Doctests
+        run: cargo test --doc --release --locked
+
+      - name: Deny (supply-chain policy)
+        run: cargo deny check
+
+      - name: Shear (unused dependencies)
+        run: cargo shear
+
+  agent-musl:
+    name: agent (rust) — static musl build (release target)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: gino-agent
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: System deps (musl cross + C toolchain)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools musl-dev cmake clang libclang-dev
+
+      - name: Rust toolchain + musl target
+        run: |
+          rustup show
+          rustup target add x86_64-unknown-linux-musl
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-agent/target
+          key: cargo-musl-${{ runner.os }}-${{ hashFiles('gino-agent/Cargo.lock') }}
+          restore-keys: cargo-musl-${{ runner.os }}-
+
+      # The release workflow's target and flags (release profile here for speed).
+      - name: Build (static musl)
+        env:
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          AR_x86_64_unknown_linux_musl: ar
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          RUSTFLAGS: "-C target-feature=+crt-static -C relocation-model=static"
+        run: |
+          cargo build --release --locked --target x86_64-unknown-linux-musl
+          bin=target/x86_64-unknown-linux-musl/release/gino-agent
+          if readelf -d "$bin" | grep '(NEEDED)'; then
+            echo "::error::$bin has NEEDED entries"
+            exit 1
+          fi
+          ls -l "$bin"
+
+  vmm:
+    name: vmm (rust) — fmt + clippy + test + supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gino-vmm
+    steps:
+      - uses: actions/checkout@v6
+
+      # rust-toolchain.toml pins the channel (1.96.0), rustfmt/clippy and the musl target.
+      # libkrun is compiled in from its pinned git commit; it needs a C compiler (and
+      # musl-gcc for the static build) but no KVM.
+      - name: Rust toolchain
+        run: rustup show
+
+      - name: Install musl-tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-vmm/target
+          key: cargo-vmm-${{ runner.os }}-${{ hashFiles('gino-vmm/Cargo.lock') }}
+          restore-keys: cargo-vmm-${{ runner.os }}-
+
+      - name: Install cargo tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.19.8,cargo-shear@1.13.1
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --release --locked --all-targets
+
+      - name: Test
+        run: cargo test --release --locked
+
+      - name: Deny (supply-chain policy)
+        run: cargo deny check
+
+      - name: Shear (unused dependencies)
+        run: cargo shear
+
+      - name: Build static binary
+        run: |
+          cargo build --profile dist --locked --target x86_64-unknown-linux-musl
+          bin=target/x86_64-unknown-linux-musl/dist/gino-vmm
+          if readelf -d "$bin" | grep '(NEEDED)'; then
+            echo "::error::$bin has NEEDED entries"
+            exit 1
+          fi
+          ls -l "$bin"
+
+  e2ee:
+    name: e2ee (rust) — fmt + clippy + test + supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: gino-e2ee
+    steps:
+      - uses: actions/checkout@v6
+
+      # rust-toolchain.toml pins the channel (1.96.0), rustfmt/clippy and the wasm32 target.
+      - name: Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-e2ee/target
+          key: cargo-e2ee-${{ runner.os }}-${{ hashFiles('gino-e2ee/Cargo.lock') }}
+          restore-keys: cargo-e2ee-${{ runner.os }}-
+
+      - name: Install cargo tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.19.8,cargo-shear@1.13.1,cargo-nextest@0.9.149
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --release --locked --all-targets
+
+      - name: Test
+        run: cargo nextest run --release --locked
+
+      - name: Doctests
+        run: cargo test --doc --release --locked
+
+      - name: Deny (supply-chain policy)
+        run: cargo deny check
+
+      - name: Shear (unused dependencies)
+        run: cargo shear
+
+  mini-host:
+    name: mini-host (rust) — fmt + clippy + test + supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: gino-mini-host
+    steps:
+      - uses: actions/checkout@v6
+
+      # rust-toolchain.toml pins the channel (1.96.0) + rustfmt/clippy components.
+      - name: Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-mini-host/target
+          key: cargo-mini-host-${{ runner.os }}-${{ hashFiles('gino-mini-host/Cargo.lock') }}
+          restore-keys: cargo-mini-host-${{ runner.os }}-
+
+      - name: Install cargo tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.19.8,cargo-shear@1.13.1,cargo-nextest@0.9.149
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --release --locked --all-targets
+
+      - name: Test
+        run: cargo nextest run --release --locked
+
+      - name: Deny (supply-chain policy)
+        run: cargo deny check
+
+      - name: Shear (unused dependencies)
+        run: cargo shear
+
+  e2ee-ts:
+    name: e2ee (ts) — wasm build + bun test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: sdks/e2ee
+    steps:
+      - uses: actions/checkout@v6
+
+      # rust-toolchain.toml pins the channel (1.96.0), clippy and the wasm32 target.
+      - name: Rust toolchain
+        working-directory: gino-e2ee
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-e2ee/target
+          key: cargo-e2ee-wasm-${{ runner.os }}-${{ hashFiles('gino-e2ee/Cargo.lock') }}
+          restore-keys: cargo-e2ee-wasm-${{ runner.os }}-
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Field map (generated code up to date)
+        run: bun run gen:field-map --check
+
+      # Lint, typecheck (with the field-map generator), test, build.
+      - name: Check
+        run: bun run check
+
+      # src/wasm.rs compiles only for wasm32.
+      - name: Clippy (wasm32)
+        working-directory: gino-e2ee
+        run: cargo clippy --locked --lib --target wasm32-unknown-unknown
+
+      # Rebuilds the wasm package in gino-e2ee/docker/wasm.Dockerfile (the toolchain,
+      # wasm-bindgen-cli and binaryen the committed wasm/ was built with) and fails if
+      # the committed wasm/ differs.
+      - name: Wasm drift check
+        working-directory: .
+        run: |
+          docker build -t gino-e2ee-wasm -f gino-e2ee/docker/wasm.Dockerfile gino-e2ee/docker
+          docker run --rm -v "$GITHUB_WORKSPACE:/gino" -w /gino/sdks/e2ee gino-e2ee-wasm \
+            bash scripts/check-wasm.sh
+
+  security:
+    name: security scans
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # trufflehog walks history
+
+      # The first push of a branch has no base commit to diff against.
+      - name: trufflehog (secrets)
+        if: github.event_name != 'push' || github.event.before != '0000000000000000000000000000000000000000'
+        uses: trufflesecurity/trufflehog@v3.95.5
+        with:
+          extra_args: --results=verified,unknown
+
+      - name: osv-scanner (dependency CVEs)
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        with:
+          scan-args: |-
+            --lockfile=sdks/e2ee/bun.lock
+            --lockfile=gino-agent/Cargo.lock
+
+  dependency-review:
+    name: dependency review (PR only)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+

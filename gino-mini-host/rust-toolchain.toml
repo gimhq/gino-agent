@@ -1,0 +1,6 @@
+[toolchain]
+# Match the declared MSRV (Cargo.toml `rust-version`). 1.96.0 is installed on the
+# build host; bump deliberately in a minor release, never in a patch release.
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -1,0 +1,8 @@
+[run]
+shell = "system"
+
+[test]
+coverage = true
+coverageSkipTestFiles = true
+coverageReporter = ["text"]
+coveragePathIgnorePatterns = ["wasm/**"]

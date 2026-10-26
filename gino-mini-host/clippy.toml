@@ -1,0 +1,7 @@
+# `unwrap_used`/`expect_used`/`panic`/`dbg_macro` = deny is relaxed inside
+# tests so assertions can use `unwrap`/`expect` without ceremony.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true
+allow-print-in-tests = true

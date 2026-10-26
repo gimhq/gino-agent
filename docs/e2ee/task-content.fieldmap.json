@@ -1,0 +1,105 @@
+{
+  "format": "gino-e2ee/field-map/v1",
+  "profile": "gino.task-content.v1",
+  "frames": {
+    "message": {
+      "direction": "host_to_agent",
+      "scope": "taskId",
+      "fields": [
+        {
+          "path": "data.text",
+          "kind": "text",
+          "envelopes": ["content", "drop"],
+          "aad": "scope:{taskId}|frame:message|field:text"
+        },
+        {
+          "path": "data.attachments[].name",
+          "kind": "text",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:message|attachment:{data.attachments[].sha256}|field:name"
+        },
+        {
+          "path": "data.attachments[]",
+          "kind": "blob",
+          "envelopes": ["file"],
+          "aad": "scope:{taskId}|field:file"
+        }
+      ]
+    },
+    "cron_upsert": {
+      "direction": "host_to_agent",
+      "scope": "taskId",
+      "fields": [
+        {
+          "path": "data.prompt",
+          "kind": "text",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:cron_upsert|field:prompt"
+        }
+      ]
+    },
+    "thread_message": {
+      "direction": "agent_to_host",
+      "scope": "taskId",
+      "fields": [
+        {
+          "path": "data.content",
+          "kind": "text",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_message|thread:{threadId}|seq:{data.seq}|field:content"
+        },
+        {
+          "path": "data.input",
+          "kind": "json",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_message|thread:{threadId}|seq:{data.seq}|field:input",
+          "when": { "path": "data.kind", "op": "ne", "value": "host_action" }
+        },
+        {
+          "path": "data.input.params",
+          "kind": "json",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_message|thread:{threadId}|seq:{data.seq}|field:input.params",
+          "when": { "path": "data.kind", "op": "eq", "value": "host_action" },
+          "keyed_plain": { "key": "data.input.method", "table": {} }
+        },
+        {
+          "path": "data.output.content",
+          "kind": "json",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_message|thread:{threadId}|seq:{data.seq}|field:output.content"
+        }
+      ]
+    },
+    "thread_result": {
+      "direction": "agent_to_host",
+      "scope": "taskId",
+      "fields": [
+        {
+          "path": "data.result",
+          "kind": "text",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_result|thread:{threadId}|delivery:{outboxId}|field:result"
+        },
+        {
+          "path": "data.error",
+          "kind": "text",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_result|thread:{threadId}|delivery:{outboxId}|field:error"
+        },
+        {
+          "path": "data.attachments[].name",
+          "kind": "text",
+          "envelopes": ["content"],
+          "aad": "scope:{taskId}|frame:thread_result|thread:{threadId}|attachment:{data.attachments[].sha256}|field:name"
+        },
+        {
+          "path": "data.attachments[]",
+          "kind": "blob",
+          "envelopes": ["file"],
+          "aad": "scope:{taskId}|field:file"
+        }
+      ]
+    }
+  }
+}

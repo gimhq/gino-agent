@@ -1,0 +1,58 @@
+{
+  "name": "@gino/e2ee",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Gino end-to-end encryption for TypeScript — the gino-e2ee crate compiled to wasm (envelopes, history, field maps, MLS scope groups, client helpers) and the host-side key directory and Delivery Service (`@gino/e2ee/ds`).",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gimhq/gino-agent.git",
+    "directory": "sdks/e2ee"
+  },
+  "files": [
+    "dist",
+    "src",
+    "wasm"
+  ],
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ds": {
+      "bun": "./src/ds/index.ts",
+      "types": "./dist/ds/index.d.ts",
+      "import": "./dist/ds/index.js"
+    },
+    "./ds/testing": {
+      "bun": "./src/ds/testing.ts",
+      "types": "./dist/ds/testing.d.ts",
+      "import": "./dist/ds/testing.js"
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "bun --env-file=/dev/null test ./tests/",
+    "build": "bun build src/index.ts --outdir dist --target browser --format esm && bun build src/ds/index.ts src/ds/testing.ts --outdir dist/ds --target node --format esm --external @gino/e2ee --external zod && tsc -p tsconfig.build.json",
+    "build:wasm": "bash ../../gino-e2ee/scripts/build-wasm.sh wasm",
+    "check:wasm": "bash scripts/check-wasm.sh",
+    "gen:field-map": "bun run scripts/gen-field-map.ts",
+    "check": "bun run lint && bun run typecheck && bun run test && bun run build"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "9.0.0",
+    "@types/bun": "1.3.14",
+    "eslint": "10.5.0",
+    "jiti": "^2.7.0",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "micromark-extension-math>katex": "0.19.1"
+  }
+}

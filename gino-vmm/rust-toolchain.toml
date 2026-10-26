@@ -1,0 +1,7 @@
+[toolchain]
+# Match the declared MSRV (Cargo.toml `rust-version`) and the gino-agent toolchain.
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+# The static `gino-vmm` build target.
+targets = ["x86_64-unknown-linux-musl"]
+profile = "minimal"

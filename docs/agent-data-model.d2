@@ -1,0 +1,182 @@
+# Agent data-plane entity-relationship model
+# Source of truth: docs/agent-architecture.md (§2 hierarchy, §3 schema, §11 host mirror)
+# Render: d2 docs/agent-data-model.d2 docs/agent-data-model.svg
+#
+# One task is the global top category; crons and threads belong to it (1:N).
+# "session" survives only as the threads.engine_session_id field — not an entity.
+
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 0
+    pad: 40
+  }
+}
+
+direction: right
+
+classes: {
+  anchor: {
+    style: { fill: "#fef3c7"; stroke: "#b45309"; stroke-width: 2 }
+  }
+  schedule: {
+    style: { fill: "#dbeafe"; stroke: "#1d4ed8" }
+  }
+  result: {
+    style: { fill: "#dcfce7"; stroke: "#15803d" }
+  }
+  mirror: {
+    style: { fill: "#f1f5f9"; stroke: "#475569" }
+  }
+  frame: {
+    style: { stroke: "#9333ea"; stroke-dash: 3; animated: true; font-color: "#9333ea" }
+  }
+  belongs: {
+    style: { stroke: "#b45309"; stroke-width: 2 }
+  }
+}
+
+runner: "Runner (data plane) · SQLite" {
+  style: { fill: "#ffffff"; stroke: "#334155" }
+
+  task: {
+    shape: sql_table
+    class: anchor
+    id: TEXT {constraint: primary_key}
+    name: TEXT
+    kind: TEXT
+    status: TEXT
+    note: "global top category — everything belongs here"
+  }
+
+  crons: {
+    shape: sql_table
+    class: schedule
+    id: TEXT {constraint: primary_key}
+    task_id: TEXT {constraint: foreign_key}
+    kind: "schedule | webhook | api"
+    schedule_type: "cron | interval | once"
+    schedule_value: TEXT
+    next_run: TEXT
+    continuity: "isolated | shared"
+    status: TEXT
+  }
+
+  threads: {
+    shape: sql_table
+    class: result
+    id: TEXT {constraint: primary_key}
+    task_id: TEXT {constraint: foreign_key}
+    cron_id: TEXT {constraint: foreign_key}
+    source: "cron | chat | api"
+    engine: "claude | codex | …"
+    engine_session_id: "claude --resume handle (FIELD, not entity)"
+    status: TEXT
+    failure_reason: TEXT
+    work_dir: TEXT
+    result: TEXT
+  }
+
+  cron_logs: {
+    shape: sql_table
+    class: schedule
+    id: INTEGER {constraint: primary_key}
+    cron_id: TEXT {constraint: foreign_key}
+    task_id: TEXT {constraint: foreign_key}
+    thread_id: TEXT {constraint: foreign_key}
+    round_seq: INTEGER
+    scheduled_at: "UNIQUE(cron_id, scheduled_at)"
+    status: "dispatched | skipped | missed | failed"
+    skip_reason: TEXT
+  }
+
+  # ownership: everything belongs to task
+  crons.task_id -> task.id: "N:1" { class: belongs }
+  threads.task_id -> task.id: "N:1" { class: belongs }
+  # a cron fire produces / continues a thread
+  threads.cron_id -> crons.id: "N:1 · nullable"
+  cron_logs.cron_id -> crons.id: "N:1"
+  cron_logs.thread_id -> threads.id: "0..1 · dispatched"
+}
+
+host: "Host (control plane) · read models" {
+  style: { fill: "#ffffff"; stroke: "#334155" }
+
+  h_tasks: "tasks" {
+    shape: sql_table
+    class: mirror
+    id: TEXT {constraint: primary_key}
+    name: TEXT
+    kind: TEXT
+    status: TEXT
+  }
+
+  h_crons: "crons" {
+    shape: sql_table
+    class: mirror
+    id: TEXT {constraint: primary_key}
+    task_id: TEXT {constraint: foreign_key}
+    schedule_type: TEXT
+    next_run: TEXT
+    status: TEXT
+  }
+
+  thread_runs: {
+    shape: sql_table
+    class: mirror
+    id: "TEXT (= thread_id)" {constraint: primary_key}
+    task_id: TEXT {constraint: foreign_key}
+    cron_id: TEXT {constraint: foreign_key}
+    status: TEXT
+    failure_reason: TEXT
+    duration_ms: INTEGER
+  }
+
+  messages: {
+    shape: sql_table
+    class: mirror
+    id: INTEGER {constraint: primary_key}
+    task_id: TEXT {constraint: foreign_key}
+    thread_id: TEXT {constraint: foreign_key}
+    seq: INTEGER
+    kind: "user_input | assistant_text | thinking | tool_* | error"
+    content: TEXT
+  }
+
+  attachments: {
+    shape: sql_table
+    class: mirror
+    id: TEXT {constraint: primary_key}
+    task_id: TEXT {constraint: foreign_key}
+    thread_id: TEXT {constraint: foreign_key}
+    sha256: TEXT
+    ref: "presigned URL | proxy key"
+    "direction": "input | output"
+  }
+
+  h_crons.task_id -> h_tasks.id: "N:1"
+  thread_runs.task_id -> h_tasks.id: "N:1"
+  messages.thread_id -> thread_runs.id: "N:1"
+  attachments.id <- messages.id: "ref by id"
+}
+
+# protocol bridge — references on the wire, bytes out-of-band.
+# Definitions flow down (host authors), state/transcript mirror up (runner authoritative).
+host.h_tasks -> runner.task: "task_upsert / task_delete" { class: frame }
+host.h_crons -> runner.crons: "cron_upsert / cron_delete" { class: frame }
+runner.crons -> host.h_crons: "cron_state (+ ledger summary)" { class: frame }
+runner.threads -> host.thread_runs: "thread_result" { class: frame }
+runner.threads -> host.messages: "thread_message (seq, kind)" { class: frame }
+
+legend: |md
+  ### Legend
+  - **task** — global top category (anchor); 1 task : N crons, 1 task : N threads
+  - **cron** — trigger; isolated fire → new thread, shared fire → continue one thread (a turn)
+  - **thread** — one engine execution / conversation; `engine_session_id` is a field (the `--resume` handle), not an entity
+  - **cron_logs** — per-fire scheduling ledger (local; records skips that produce no thread)
+  - **transport** — `inbox`/`outbox` carry `task_id`/`thread_id` (delivery buffers, GC-able; not shown)
+  - **purple dashed** — protocol frames; host owns the durable transcript (`messages`)
+| {
+  near: bottom-center
+  style: { fill: "#fafafa"; stroke: "#94a3b8" }
+}

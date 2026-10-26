@@ -1,0 +1,18 @@
+# osv-scanner ignores for Cargo.lock. The first two mirror deny.toml [advisories].ignore;
+# the libcrux-kem ones are lockfile-only (cargo-deny never sees the crate).
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0387"
+reason = "crypto-bigint 0.5 via elliptic-curve 0.13 from the pinned openmls_rust_crypto 0.6.0; only suite 0x0001 is used, which never reaches it"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0173"
+reason = "proc-macro-error2 unmaintained, no fix; build-time only via hax-lib-macros <- libcrux-sha3 <- hpke-rs 0.7"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0330"
+reason = "libcrux-kem 0.0.9 is in Cargo.lock only as an optional dependency of hpke-rs 0.7 (libcrux feature off) and is never built; the fix needs hpke-rs 0.8, which openmls_rust_crypto 0.6.0 (latest) does not allow"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0331"
+reason = "libcrux-kem 0.0.9, never built; see RUSTSEC-2026-0330"
