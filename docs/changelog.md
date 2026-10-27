@@ -69,3 +69,8 @@ official installers (`--version`, or `--channel stable|latest` for claude) with
 install, else the engine on `PATH`; claude always runs with `DISABLE_AUTOUPDATER=1`. Heartbeats
 carry `engines` (`{name, version?, path}`, protocol §5 and the frame schema). A `vm` run of an
 agent-installed engine gets the engine home as a read-only share at its host path.
+
+## 2026-10-27 23:10 [progress]
+
+osv-scanner: GHSA-qwgh-2vcv-g2f7 (block-buffer 0.10.4 via digest 0.10, no fixed 0.10 release) is
+ignored with a reason in `gino-agent/osv-scanner.toml`.
