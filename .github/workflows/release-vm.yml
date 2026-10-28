@@ -103,8 +103,11 @@ jobs:
         run: CARGO_REGISTRY='' CARGO_GIT='' vm/vmm/build.sh
       - name: Root image
         run: vm/rootfs/build.sh
+      # As root: smoke.sh hands the boot root to the VMM user (uid 1000) and cleans up after it.
       - name: Boot check
-        run: CARGO_REGISTRY='' CARGO_GIT='' vm/smoke.sh
+        run: |
+          sudo git config --system --add safe.directory "${GITHUB_WORKSPACE}"
+          sudo env CARGO_REGISTRY='' CARGO_GIT='' PATH="${PATH}" vm/smoke.sh
       - name: Rootfs changed since the previous release?
         id: change
         env:
