@@ -75,11 +75,14 @@ const STDERR_TAIL: usize = 1024;
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct VmConfig {
-    /// Guest kernel image.
+    /// Guest kernel image; unset takes the lode resource (see [`LODE_RESOURCES`]).
+    #[serde(default)]
     pub(crate) kernel: PathBuf,
     /// Guest root filesystem image (raw ext4), the base of every root disk.
+    #[serde(default)]
     pub(crate) rootfs: PathBuf,
     /// The `gino-vmm` binary.
+    #[serde(default)]
     pub(crate) vmm: PathBuf,
     /// Whether the removed `libkrun` key is present; `validate` rejects it.
     #[serde(default, rename = "libkrun", deserialize_with = "present")]
@@ -95,6 +98,14 @@ pub(crate) struct VmConfig {
     #[serde(default)]
     pub(crate) docker: bool,
 }
+
+/// Per path field: the lode resource, the variable lode sets to its installed
+/// dir, and the file the resource bundle holds.
+const LODE_RESOURCES: [(&str, &str, &str); 3] = [
+    ("kernel", "LODE_RESOURCE_KERNEL", "vmlinux"),
+    ("rootfs", "LODE_RESOURCE_ROOTFS", "rootfs.ext4"),
+    ("vmm", "LODE_RESOURCE_VMM", "gino-vmm"),
+];
 
 /// Accept any value, recording only that the key is present.
 fn present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
@@ -114,8 +125,25 @@ fn default_disk_gib() -> u32 {
 }
 
 impl VmConfig {
-    /// Reject the removed `libkrun` key and check the paths are absolute and
-    /// the sizes in range.
+    fn paths_mut(&mut self) -> [&mut PathBuf; 3] {
+        [&mut self.kernel, &mut self.rootfs, &mut self.vmm]
+    }
+
+    /// Set each unset path to its file in the installed lode resource, when
+    /// `env` names one. lode's dir is the resource's `current` link, so the
+    /// path follows resource updates.
+    pub(crate) fn fill_from_lode(&mut self, env: impl Fn(&str) -> Option<OsString>) {
+        for (path, (_, var, file)) in self.paths_mut().into_iter().zip(LODE_RESOURCES) {
+            if path.as_os_str().is_empty()
+                && let Some(dir) = env(var).filter(|dir| !dir.is_empty())
+            {
+                *path = PathBuf::from(dir).join(file);
+            }
+        }
+    }
+
+    /// Reject the removed `libkrun` key and check the paths are set and
+    /// absolute and the sizes in range.
     pub(crate) fn validate(&self) -> Result<(), IsolationError> {
         if self.has_libkrun {
             return Err(IsolationError::InvalidVm(
@@ -123,12 +151,13 @@ impl VmConfig {
                     .to_string(),
             ));
         }
-        let paths = [
-            ("kernel", &self.kernel),
-            ("rootfs", &self.rootfs),
-            ("vmm", &self.vmm),
-        ];
-        for (field, path) in paths {
+        let paths = [&self.kernel, &self.rootfs, &self.vmm];
+        for (path, (field, var, _)) in paths.into_iter().zip(LODE_RESOURCES) {
+            if path.as_os_str().is_empty() {
+                return Err(IsolationError::InvalidVm(format!(
+                    "{field} is not set: configure `vm.{field}` or install the lode resource `{field}` ({var})"
+                )));
+            }
             if !path.is_absolute() {
                 return Err(IsolationError::InvalidVm(format!(
                     "{field} `{}` is not absolute",
@@ -1727,6 +1756,7 @@ async fn read_tail(stderr: &mut ChildStderr) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
     use std::os::unix::fs::PermissionsExt as _;
     use std::path::{Path, PathBuf};
 
@@ -1785,19 +1815,62 @@ mod tests {
             self.vmm = vmm.into();
             self
         }
+
+        fn with_paths(mut self, kernel: &str, rootfs: &str, vmm: &str) -> Self {
+            self.kernel = kernel.into();
+            self.rootfs = rootfs.into();
+            self.vmm = vmm.into();
+            self
+        }
     }
 
     #[test]
-    fn missing_or_unknown_fields_fail_to_parse() {
+    fn unknown_fields_fail_to_parse() {
         for raw in [
-            r#"{ "rootfs": "/r", "vmm": "/v" }"#,
-            r#"{ "kernel": "/k", "vmm": "/v" }"#,
-            r#"{ "kernel": "/k", "rootfs": "/r" }"#,
             r#"{ "kernel": "/k", "rootfs": "/r", "vmm": "/v", "memoryMiB": 512 }"#,
             r#"{ "kernel": "/k", "rootfs": "/r", "vmm": "/v", "vcpus": -1 }"#,
         ] {
             assert!(parse(raw).is_err(), "{raw}");
         }
+    }
+
+    #[test]
+    fn lode_resources_fill_the_unset_paths() {
+        let env = |name: &str| match name {
+            "LODE_RESOURCE_KERNEL" => Some("/srv/lode/resources/kernel/current".into()),
+            "LODE_RESOURCE_VMM" => Some("/srv/lode/resources/vmm/current".into()),
+            "LODE_RESOURCE_ROOTFS" => Some("/srv/lode/resources/rootfs/current".into()),
+            _ => None,
+        };
+        let mut cfg = parse("{}").unwrap();
+        cfg.fill_from_lode(env);
+        assert_eq!(
+            [&cfg.kernel, &cfg.vmm, &cfg.rootfs].map(|p| p.display().to_string()),
+            [
+                "/srv/lode/resources/kernel/current/vmlinux",
+                "/srv/lode/resources/vmm/current/gino-vmm",
+                "/srv/lode/resources/rootfs/current/rootfs.ext4",
+            ]
+        );
+        cfg.validate().unwrap();
+
+        // An explicit path wins over the resource.
+        let mut cfg = parse(r#"{ "kernel": "/k", "rootfs": "/r", "vmm": "/v" }"#).unwrap();
+        cfg.fill_from_lode(env);
+        assert_eq!(cfg, config(Path::new("/")).with_paths("/k", "/r", "/v"));
+    }
+
+    #[test]
+    fn an_unset_path_names_its_field_and_resource() {
+        let mut cfg = parse(r#"{ "kernel": "/k", "vmm": "/v" }"#).unwrap();
+        cfg.fill_from_lode(|name| (name == "LODE_RESOURCE_ROOTFS").then(OsString::new));
+        let err = cfg.validate().unwrap_err();
+        assert!(matches!(err, IsolationError::InvalidVm(_)), "{err:?}");
+        assert!(
+            err.to_string()
+                .contains("rootfs is not set: configure `vm.rootfs` or install the lode resource `rootfs` (LODE_RESOURCE_ROOTFS)"),
+            "{err}"
+        );
     }
 
     #[test]

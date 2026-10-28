@@ -1004,7 +1004,10 @@ pub(crate) fn load_isolation_file(
             "expected a JSON object",
         )));
     }
-    let spec: IsolationSpec = serde_json::from_value(value).map_err(parse_error)?;
+    let mut spec: IsolationSpec = serde_json::from_value(value).map_err(parse_error)?;
+    if let Some(vm) = spec.vm.as_mut() {
+        vm.fill_from_lode(|name| std::env::var_os(name));
+    }
     sandbox::validate_floor(&spec, workspace_dir).map_err(|source| {
         ConfigError::IsolationFileInvalid {
             path: path.to_path_buf(),
@@ -2179,6 +2182,8 @@ mod tests {
         };
         assert!(invalid(r#"{ "mode": "vm" }"#));
         for vm in [
+            r#"{ "rootfs": "/r", "vmm": "/v" }"#,
+            r#"{ "kernel": "/k", "rootfs": "/r" }"#,
             r#"{ "kernel": "vmlinux", "rootfs": "/r", "vmm": "/v" }"#,
             r#"{ "kernel": "/k", "rootfs": "/r", "vmm": "/v", "libkrun": "/lib/libkrun.so.1" }"#,
             r#"{ "kernel": "/k", "rootfs": "/r", "vmm": "/v", "vcpus": 0 }"#,
@@ -2191,19 +2196,12 @@ mod tests {
                 "{vm}"
             );
         }
-        for vm in [
-            r#"{ "rootfs": "/r", "vmm": "/v" }"#,
-            r#"{ "kernel": "/k", "rootfs": "/r" }"#,
-            r#"{ "kernel": "/k", "rootfs": "/r", "vmm": "/v", "cpus": 2 }"#,
-        ] {
-            assert!(
-                matches!(
-                    load_err(&format!(r#"{{ "mode": "vm", "vm": {vm} }}"#)),
-                    ConfigError::IsolationFileParse { .. }
-                ),
-                "{vm}"
-            );
-        }
+        assert!(matches!(
+            load_err(
+                r#"{ "mode": "vm", "vm": { "kernel": "/k", "rootfs": "/r", "vmm": "/v", "cpus": 2 } }"#
+            ),
+            ConfigError::IsolationFileParse { .. }
+        ));
     }
 
     #[test]

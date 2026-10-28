@@ -9,7 +9,8 @@ name: release
 # signing key never reaches a job that runs dependency code (cargo build scripts):
 # with the repository secret LODE_SIGNING_KEY (an ed25519 seed from
 # `lode-cli keygen`) `publish` writes a `<asset>.sig` sidecar; without it the asset
-# uploads unsigned.
+# uploads unsigned. Only agent releases (`v*` tags) build here; the VM channels release through
+# release-vm.yml.
 on:
   release:
     types: [published]
@@ -30,13 +31,14 @@ concurrency:
 env:
   AGENT_APP: gino-agent
   AGENT_ASSET: gino-agent-linux-x64.tar.gz
-  LODE_VERSION: v0.2.1
+  LODE_VERSION: v0.4.0
   # Untrusted-input-safe: the tag flows through an env var, never inlined into a run/ref.
   RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
   agent:
     name: agent static binary (musl)
+    if: startsWith(github.event.release.tag_name || inputs.tag, 'v')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:

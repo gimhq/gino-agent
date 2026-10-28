@@ -589,7 +589,11 @@ static musl binary with no host library needs.
           "diskGib": 32, "docker": false } }
 ```
 
-- `kernel`, `rootfs` (the ext4 base image), `vmm` are required absolute paths; `vcpus` 1..=32
+- `kernel`, `rootfs` (the ext4 base image), `vmm` are absolute paths. An omitted one is taken from
+  the lode resource of the same name: `$LODE_RESOURCE_KERNEL/vmlinux`,
+  `$LODE_RESOURCE_ROOTFS/rootfs.ext4`, `$LODE_RESOURCE_VMM/gino-vmm` (lode's `current` link, so a
+  resource update applies to the next run); neither set fails the file naming the field and the
+  variable. Under lode the block can be `"vm": {}`. `vcpus` 1..=32
   (default 2); `memoryMib` 64..=65536 (default 2048); `diskGib` 1..=4096 (default 32), the root disk
   size (never less than the image); `docker` (default false) starts `dockerd` in the guest before the
   engine. A `libkrun` key is rejected (libkrun is compiled into gino-vmm). The file

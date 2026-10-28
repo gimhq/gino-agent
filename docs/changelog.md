@@ -74,3 +74,16 @@ agent-installed engine gets the engine home as a read-only share at its host pat
 
 osv-scanner: GHSA-qwgh-2vcv-g2f7 (block-buffer 0.10.4 via digest 0.10, no fixed 0.10 release) is
 ignored with a reason in `gino-agent/osv-scanner.toml`.
+
+## 2026-10-28 01:20 [progress]
+
+VM release channels: `kernel`, `vmm` and `rootfs` release on their own through
+`.github/workflows/release-vm.yml` (`vm/release.sh`) as the lode resources `gino-agent/<channel>`:
+`<channel>.<YYYYMMDD-HHMM>` releases (lode version `YYYY.MMDD.HHMM`), kernel and vmm only when
+their inputs change, the rootfs rolling weekly and released when its packages change; every run
+boot-checks all three with `vm/smoke.sh`, publishes with `--latest=false` and updates the
+channel's signed `lode/v1` manifest on the rolling `<channel>-manifest` release. `release.yml`
+builds only `v*` tags; lode-cli v0.4.0. The agent's `vm.kernel` / `vm.rootfs` / `vm.vmm` fall back
+to `LODE_RESOURCE_<NAME>` (agent-architecture §9e).
+Verification: agent fmt, clippy, deny, shear, nextest (954 passed); actionlint, shellcheck; local
+`lode-cli pull` (enforced signatures) of the three real assets, byte-identical to the builds.

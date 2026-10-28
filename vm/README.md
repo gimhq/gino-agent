@@ -10,6 +10,7 @@ already done.
 | `kernel/build.sh` | `.tmp/vm/kernel/vmlinux` (ELF) + `config`, `fragment.sha256` |
 | `rootfs/build.sh` | `.tmp/vm/rootfs/rootfs.ext4` (raw ext4 base image) + `rootfs.image`, `rootfs.versions` |
 | `smoke.sh` | runs the three above, probes `gino-vmm`, boots the guest and checks it |
+| `release.sh` | release helpers for `release-vm.yml`: stamp, inputs hash, packaging, lode manifest (see [Releases](#releases)) |
 
 ## Guest root
 
@@ -49,3 +50,52 @@ The agent's KVM integration suite, `gino-agent/scripts/vm-it.sh`, builds or reus
 artifacts (agent-architecture §9e).
 
 `spike/` is the earlier feasibility spike with its own scripts.
+
+## Releases
+
+`kernel`, `vmm` and `rootfs` are released on their own, independent of the agent and of each
+other, as the lode resources `gino-agent/<channel>` (`.github/workflows/release-vm.yml`,
+`release.sh`):
+
+```sh
+gh workflow run release-vm.yml -f channel=kernel   # or vmm, rootfs
+```
+
+- A release is `<channel>.<YYYYMMDD-HHMM>` (UTC, the run start) at the `main` commit the run
+  started on; its lode version is the same stamp as `YYYY.MMDD.HHMM` (leading zeros dropped), so
+  every release is a semver upgrade of the one before.
+- `kernel` and `vmm` are released only when their inputs (`vm/kernel/`; `vm/vmm/` and
+  `gino-vmm/`) differ from the latest release's. The `rootfs` rolls: it is rebuilt weekly (Monday
+  03:17 UTC) and on dispatch, picking up Debian updates, and released only when its pins or
+  installed package versions differ from the latest release's.
+- Every run builds all three and boots them with `smoke.sh` before publishing anything.
+- The release holds `gino-<channel>-linux-x64.tar.gz` (`vmlinux` + `config`, `gino-vmm`, or a
+  sparse `rootfs.ext4` + `rootfs.versions`), its `.sig` when the repository secret
+  `LODE_SIGNING_KEY` is set, `SHA256SUMS` and `release.lock` (channel, version, commit, inputs
+  hash, asset sha256, upstream versions). It and the manifest holders are created with
+  `--latest=false`: the agent release must stay the repository latest, which lode's github source
+  reads, and the run fails otherwise.
+- Each channel's signed `lode/v1` manifest (the newest 10 versions, `stable` at the newest) is
+  `manifest.json` on the rolling release `<channel>-manifest`.
+
+Operator `lode.toml` for a vm host (the agent's `vm` block can then omit the three paths):
+
+```toml
+[[resource]]
+name = "kernel"
+manifest = "https://github.com/gimhq/gino-agent/releases/download/kernel-manifest/manifest.json"
+asset = "gino-kernel-linux-x64.tar.gz"
+required = true
+
+[[resource]]
+name = "vmm"
+manifest = "https://github.com/gimhq/gino-agent/releases/download/vmm-manifest/manifest.json"
+asset = "gino-vmm-linux-x64.tar.gz"
+required = true
+
+[[resource]]
+name = "rootfs"
+manifest = "https://github.com/gimhq/gino-agent/releases/download/rootfs-manifest/manifest.json"
+asset = "gino-rootfs-linux-x64.tar.gz"
+required = true
+```

@@ -34,3 +34,4 @@ Each plan is a single line linking to its detail file. All detailed information 
 - [x] [**20261027-0614-vm-block-root-docker VM block root, task disks and Docker**](20261027-0614-vm-block-root-docker.md) `2026-10-27`
 - [x] [**20261027-0614-engine-install-update Engine install and update**](20261027-0614-engine-install-update.md) `2026-10-27`
 - [ ] [**20261027-0614-chunk-block-storage Chunk-based block storage engine**](20261027-0614-chunk-block-storage.md) `2026-10-27`
+- [x] [**20261028-0050-vm-image-release Kernel, vmm and rootfs release channels with lode**](20261028-0050-vm-image-release.md) `2026-10-28`

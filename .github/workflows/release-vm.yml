@@ -1,0 +1,232 @@
+name: release-vm
+
+# Releases one VM channel -- kernel, vmm or rootfs -- on its own, as the lode resource
+# `gino-agent/<channel>` (vm/release.sh). Cut by hand from main:
+#
+#   gh workflow run release-vm.yml -f channel=kernel|vmm|rootfs
+#
+# and the rootfs rolls weekly on the schedule. The run stamps the release
+# `<channel>.<YYYYMMDD-HHMM>` (lode version `YYYY.MMDD.HHMM`) at the main commit it started on.
+# kernel and vmm stop when their inputs hash equals the latest release's; the rootfs always
+# rebuilds (Debian updates move it) and stops when its package versions equal the latest
+# release's. Every channel is built with the other two and boot-checked (vm/smoke.sh) before
+# anything is published.
+#
+# publish creates the release as a draft with --latest=false, uploads the asset, its `.sig`
+# (with LODE_SIGNING_KEY), SHA256SUMS and release.lock last, publishes it, then adds the version
+# to the channel manifest on the rolling release `<channel>-manifest`. The agent release must stay
+# the repository's latest (lode reads the agent from /releases/latest): the run fails otherwise.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "VM channel to release"
+        required: true
+        type: choice
+        options: [kernel, vmm, rootfs]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+# One release of a channel at a time, none cancelled.
+concurrency:
+  group: release-vm-${{ inputs.channel || 'rootfs' }}
+  cancel-in-progress: false
+
+env:
+  CHANNEL: ${{ inputs.channel || 'rootfs' }}
+  LODE_VERSION: v0.4.0
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  plan:
+    name: plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      inputs: ${{ steps.plan.outputs.inputs }}
+      previous: ${{ steps.plan.outputs.previous }}
+      skip: ${{ steps.plan.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Tag, version and inputs
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          read -r stamp version < <(vm/release.sh stamp)
+          inputs="$(vm/release.sh inputs "${CHANNEL}")"
+          previous="$(vm/release.sh latest "${CHANNEL}")"
+          skip=false
+          if [[ -n "${previous}" && "${CHANNEL}" != rootfs ]]; then
+            prev_inputs="$(gh release download "${previous}" -p release.lock -O - | jq -r .inputs)"
+            if [[ "${prev_inputs}" == "${inputs}" ]]; then
+              echo "unchanged: ${CHANNEL} inputs equal ${previous}'s" | tee -a "${GITHUB_STEP_SUMMARY}"
+              skip=true
+            fi
+          fi
+          {
+            echo "tag=${CHANNEL}.${stamp}"
+            echo "version=${version}"
+            echo "inputs=${inputs}"
+            echo "previous=${previous}"
+            echo "skip=${skip}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "release: ${CHANNEL}.${stamp} (${version}) at ${GITHUB_SHA}, previous: ${previous:-none}"
+
+  # Builds the three channels and boots them; packs only the released one. No secrets.
+  build:
+    name: build + boot check
+    needs: [plan]
+    if: needs.plan.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      changed: ${{ steps.change.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: KVM for the boot check
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -c /dev/kvm
+      - name: Kernel
+        run: vm/kernel/build.sh
+      - name: gino-vmm
+        run: CARGO_REGISTRY='' CARGO_GIT='' vm/vmm/build.sh
+      - name: Root image
+        run: vm/rootfs/build.sh
+      - name: Boot check
+        run: CARGO_REGISTRY='' CARGO_GIT='' vm/smoke.sh
+      - name: Rootfs changed since the previous release?
+        id: change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS: ${{ needs.plan.outputs.previous }}
+        run: |
+          set -euo pipefail
+          changed=true
+          if [[ "${CHANNEL}" == rootfs && -n "${PREVIOUS}" ]]; then
+            # The image lines name this build; the rest are the pins and the installed packages.
+            gh release download "${PREVIOUS}" -p release.lock -O - | jq -r .versions > previous.versions
+            if diff <(grep -v '^image' previous.versions) <(grep -v '^image' .tmp/vm/rootfs/rootfs.versions) > versions.diff; then
+              echo "unchanged: rootfs packages equal ${PREVIOUS}'s" | tee -a "${GITHUB_STEP_SUMMARY}"
+              changed=false
+            else
+              { echo '```diff'; cat versions.diff; echo '```'; } >> "${GITHUB_STEP_SUMMARY}"
+            fi
+          fi
+          echo "changed=${changed}" >> "${GITHUB_OUTPUT}"
+      - name: Package + lock
+        if: steps.change.outputs.changed == 'true'
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          INPUTS: ${{ needs.plan.outputs.inputs }}
+        run: |
+          set -euo pipefail
+          asset="$(vm/release.sh package "${CHANNEL}" dist)"
+          versions=""
+          case "${CHANNEL}" in
+            kernel) versions="$(sed -n 's/^KERNEL_VERSION=/kernel=/p' vm/kernel/build.sh)" ;;
+            rootfs) versions="$(cat .tmp/vm/rootfs/rootfs.versions)" ;;
+          esac
+          jq -n --arg channel "${CHANNEL}" --arg tag "${TAG}" --arg version "${VERSION}" \
+            --arg commit "${GITHUB_SHA}" --arg inputs "${INPUTS}" \
+            --arg asset "$(basename "${asset}")" --arg sha256 "$(sha256sum "${asset}" | cut -d' ' -f1)" \
+            --arg versions "${versions}" \
+            '{channel: $channel, tag: $tag, version: $version, commit: $commit, inputs: $inputs,
+              asset: $asset, sha256: $sha256, versions: $versions}' > dist/release.lock
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        if: steps.change.outputs.changed == 'true'
+        with:
+          name: vm-dist
+          path: dist/
+          if-no-files-found: error
+
+  # Signs, creates the release and updates the channel manifest. Runs no dependency code:
+  # only the pinned, sha256-checked lode-cli, `gh` and vm/release.sh.
+  publish:
+    name: sign + release + manifest
+    needs: [plan, build]
+    if: needs.build.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          name: vm-dist
+          path: dist
+      - name: Install lode-cli
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          gh release download "${LODE_VERSION}" --repo bkhq/lode -p lode-linux-x64.tar.gz -p SHA256SUMS
+          grep ' lode-linux-x64.tar.gz$' SHA256SUMS | sha256sum -c -
+          tar -xzf lode-linux-x64.tar.gz lode lode-cli
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+      - name: Signing key
+        env:
+          LODE_SIGNING_KEY: ${{ secrets.LODE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${LODE_SIGNING_KEY}" ]]; then
+            umask 077
+            printf '%s\n' "${LODE_SIGNING_KEY}" > "${RUNNER_TEMP}/lode.key"
+            echo "LODE_KEY_FILE=${RUNNER_TEMP}/lode.key" >> "${GITHUB_ENV}"
+          else
+            echo "no LODE_SIGNING_KEY: the asset and the manifest are published unsigned" | tee -a "${GITHUB_STEP_SUMMARY}"
+          fi
+      - name: Release
+        run: |
+          set -euo pipefail
+          asset="dist/$(jq -r .asset dist/release.lock)"
+          (cd dist && sha256sum "$(basename "${asset}")" > SHA256SUMS)
+          files=("${asset}" dist/SHA256SUMS)
+          if [[ -n "${LODE_KEY_FILE:-}" ]]; then
+            lode-cli sign "${asset}" --app "gino-agent/${CHANNEL}" --version "${VERSION}" --key "${LODE_KEY_FILE}" \
+              | awk '/^sig:/ {print $2}' > "${asset}.sig"
+            test -s "${asset}.sig"
+            files+=("${asset}.sig")
+          fi
+          jq -r '"\(.channel) \(.version) (lode resource gino-agent/\(.channel)) at \(.commit)\n\n```\n\(.versions)\n```"' \
+            dist/release.lock > notes.md
+          gh release create "${TAG}" --draft --latest=false --target "${GITHUB_SHA}" --title "${TAG}" --notes-file notes.md
+          gh release upload "${TAG}" "${files[@]}"
+          gh release upload "${TAG}" dist/release.lock
+          gh release edit "${TAG}" --draft=false --latest=false
+      - name: Channel manifest
+        run: |
+          set -euo pipefail
+          holder="${CHANNEL}-manifest"
+          asset="dist/$(jq -r .asset dist/release.lock)"
+          if gh release view "${holder}" >/dev/null 2>&1; then
+            gh release download "${holder}" -p manifest.json -O manifest.json || true
+          else
+            gh release create "${holder}" --latest=false --target "${GITHUB_SHA}" --title "${holder}" \
+              --notes "lode/v1 manifest of the resource gino-agent/${CHANNEL}; updated by release-vm.yml."
+          fi
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "${asset}")"
+          LODE_CLI=lode-cli vm/release.sh manifest "${CHANNEL}" "${asset}" "${VERSION}" "${url}" manifest.json
+          gh release upload "${holder}" manifest.json --clobber
+          jq -c '{name, channels, versions: (.versions | keys)}' manifest.json | tee -a "${GITHUB_STEP_SUMMARY}"
+      - name: The agent stays the latest release
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null || true)"
+          [[ -z "${latest}" || "${latest}" == v* ]] || { echo "error: the latest release is ${latest}, not an agent release" >&2; exit 1; }
