@@ -96,7 +96,11 @@ Rules:
   `x-internal-token`). It is **never** the register token; the agent persists it locally
   (`connect.token`) and reuses it on reconnect — no re-register needed.
 - The host is the authority for `config` (credentials/engine settings arrive via the
-  host's config layer).
+  host's config layer). The register `config`, `GET /agent/config` and `config_update.data`
+  are JSON merge patches (RFC 7386) over that layer: an absent key keeps the host's value,
+  `null` removes it (the agent's own value, e.g. a local `gino-agent login` token, or the
+  default applies again), an object merges and any other value, arrays included, replaces.
+  A removed engine endpoint or credential is gone from the next engine run.
 - `capabilities` advertises the engines the runner can **actually run** — a runtime property
   (the agent probes for each engine's binary at registration), not a build constant. The host
   matches a task's `engine` (§7 `task_upsert`) against that list when **placing** the task, so an
@@ -200,7 +204,7 @@ agent-architecture); bytes never travel in frames.
 | `message` | `taskId`, `threadId?` | `{text, attachments?}` | user/system input for a task (optionally a live thread) |
 | `interrupt` | `taskId?` | — | graceful cancel of the current turn (engine stays alive); with `taskId`, scoped: the agent interrupts only if that task owns the in-flight turn. Delivery is LIVE-ONLY (at-most-once): the host sends it to an online agent and never replays it on reconnect — a stale cancel must not fire against a future turn |
 | `close` | — | `{reason?}` (`stop\|restart\|remove`) | runner-level wind-down and exit (agent removal / launcher stop), **not** per-task close — per-task close = `task_upsert{status:"closed"}` + scoped `interrupt` |
-| `config_update` | — | `{entries, version, <config fields>}` | live config change (the §3 global overlay; `data` is required — `entries` + `version` drive the version-gated reconcile) |
+| `config_update` | — | `{entries, version, <config fields>}` | live config change (a merge patch over the §3 host config, `null` removes a key; `data` is required — `entries` + `version` drive the version-gated reconcile) |
 | `fs_request` | `reqId` | `{op, path, to?, recursive?, ref? + sha256? + size?, upload?}` | one engine-free file operation; live-only (never queued, never replayed) |
 | `e2ee_key_package_status` | (top-level `id?`) | `{one_time, last_resort, rejected?}` | the runner's KeyPackage pool at the host (§5.3); live-only |
 | `e2ee_log` | `taskId` | `{seq, kind, epoch, message, drop_public_key?}` | one handshake log entry of the task's group (§5.3) |

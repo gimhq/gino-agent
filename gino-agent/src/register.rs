@@ -115,6 +115,8 @@ pub(crate) enum RegisterError {
 pub(crate) struct ResolvedIdentity {
     pub(crate) agent_id: String,
     pub(crate) connect_token: SecretString,
+    /// The register response `config` (without `protocolVersion`); `null` on reconnect.
+    pub(crate) host_config: Value,
 }
 
 /// Reuse a persisted identity (reconnect) or perform a fresh registration.
@@ -143,6 +145,7 @@ pub(crate) async fn load_or_register(
         return Ok(ResolvedIdentity {
             agent_id: identity.agent_id,
             connect_token: identity.connect_token,
+            host_config: Value::Null,
         });
     }
     register_with_backoff(
@@ -338,6 +341,7 @@ async fn register(
     Ok(ResolvedIdentity {
         agent_id: ok.agent_id,
         connect_token,
+        host_config: ok.config,
     })
 }
 

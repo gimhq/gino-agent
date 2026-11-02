@@ -256,6 +256,13 @@ by **meta** (engine-agnostic), loaded by **symlink** from one store.
   (symlinks) + **`project/workspace/`** = the git working area (code isolated here → no conflict with
   injected config) + sibling `inputs/output/logs`. Engine launches with `ENGINE_CONFIG_DIR` set and
   `cwd=project/`.
+- **Config layers**: the runner keeps its own config (bootstrap/env, the local login token, its
+  identity) apart from the host layer, the RFC 7386 merge of the register `config`, the startup
+  `GET /agent/config` and every `config_update` (`LayeredConfig`). The effective config is
+  recomputed on each update and the engine settings rebuilt for the next run, so a host `null`
+  removes a value (endpoint, credential, model) and the runner's own value or the default
+  applies without a restart. Fields read only at startup (paths, heartbeat, executor limits)
+  still change on restart.
 - **Global config VERSION gate (restart durability)**: the global config carries a host-assigned **monotonic
   `version`** served on register / `GET /agent/config` / `config_update`. At startup the runner fetches
   `GET /agent/config` (authoritative — a restart reuses its identity, so the register response no longer

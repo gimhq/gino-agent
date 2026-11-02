@@ -166,7 +166,7 @@ async fn serve_context(db: Arc<Mutex<Db>>, dir: &std::path::Path) -> ServeContex
         chat_max_attempts: 1,
         provisioner,
         engine_config_dir: dir.to_path_buf(),
-        config: Mutex::new(config),
+        config: Mutex::new(crate::config::LayeredConfig::new(config)),
         engine_settings: settings.claude,
         codex_settings: settings.codex,
         remote_ops,
@@ -221,6 +221,72 @@ async fn config_update_rotated_key_applies_to_the_next_engine_run() {
         "the next engine run must see the rotated key: {env:?}"
     );
     // …and the row is settled (applied), never left to replay.
+    assert!(lock_db(&db).list_unprocessed_inbox().unwrap().is_empty());
+}
+
+/// Route a `config_update` carrying `data` through the inbox like the transport does.
+async fn route_config_update(
+    context: &ServeContext,
+    db: &Arc<Mutex<Db>>,
+    seq: u32,
+    data: serde_json::Value,
+) {
+    let frame = InboundFrame::ConfigUpdate {
+        data,
+        msg_id: Some(crate::protocol::test_delivery_id(seq)),
+    };
+    let inbox_id = lock_db(db)
+        .record_inbound_correlated(
+            "config_update",
+            &frame,
+            None,
+            None,
+            Some(crate::protocol::test_delivery_id(seq).as_str()),
+        )
+        .unwrap()
+        .expect("a fresh msg_id stores a row");
+    assert!(
+        route(Inbound { inbox_id, frame }, context)
+            .await
+            .is_continue()
+    );
+}
+
+/// A `config_update` with `null` removes the endpoint and key an earlier one set:
+/// the next engine run has neither, without a restart.
+#[tokio::test]
+async fn config_update_null_clears_the_endpoint_and_key() {
+    let db = Arc::new(Mutex::new(Db::open_in_memory().unwrap()));
+    let dir = tempfile::tempdir().unwrap();
+    let context = serve_context(Arc::clone(&db), dir.path()).await;
+    let has = |key: &str| {
+        lock(&context.engine_settings)
+            .env
+            .iter()
+            .any(|(k, _)| k == key)
+    };
+
+    route_config_update(
+        &context,
+        &db,
+        23,
+        serde_json::json!({ "engine": {
+            "anthropicBaseUrl": "https://proxy.example",
+            "anthropicApiKey": "sk-proxy"
+        } }),
+    )
+    .await;
+    assert!(has("ANTHROPIC_BASE_URL") && has("ANTHROPIC_API_KEY"));
+
+    route_config_update(
+        &context,
+        &db,
+        24,
+        serde_json::json!({ "engine": { "anthropicBaseUrl": null, "anthropicApiKey": null } }),
+    )
+    .await;
+    assert!(!has("ANTHROPIC_BASE_URL"), "the endpoint must be gone");
+    assert!(!has("ANTHROPIC_API_KEY"), "the key must be gone");
     assert!(lock_db(&db).list_unprocessed_inbox().unwrap().is_empty());
 }
 

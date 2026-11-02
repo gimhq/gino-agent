@@ -47,7 +47,7 @@ use crate::chat::{
     InboxPromptSource, drain_with_queued_messages, ensure_chat_thread, minted_thread_id,
     seed_task_if_missing,
 };
-use crate::config::{Config, ConfigOverlay, ExecutorConfig};
+use crate::config::{Config, ConfigOverlay, ExecutorConfig, LayeredConfig};
 use crate::db::{Db, TaskRow, ThreadRow};
 use crate::e2ee::{self, E2ee, E2eeKeys};
 use crate::engine::admin::{self, EngineInfo, EngineKind};
@@ -227,6 +227,8 @@ async fn run_async(
             let _ = engines.set(report);
         });
     }
+    // The agent's own layers; the host's are kept apart (see [`LayeredConfig`]).
+    let base = config.clone();
     let identity = register::load_or_register(
         &mut config,
         &db,
@@ -242,7 +244,18 @@ async fn run_async(
     // reuses its persisted identity (no second register), so `GET /agent/config` —
     // not the register response — re-supplies the versioned desired set the version
     // gate reads (see [`fetch_and_apply_config`]). Non-fatal / offline-tolerant.
-    fetch_and_apply_config(&mut config, &identity, &http).await;
+    let mut layered = LayeredConfig::new(Config {
+        agent_id: config.agent_id.clone(),
+        connect_token: config.connect_token.clone(),
+        ..base
+    });
+    if !identity.host_config.is_null()
+        && let Err(err) = layered.update(&identity.host_config)
+    {
+        warn!(error = %err, "register config did not parse; ignoring it");
+    }
+    fetch_and_apply_config(&mut layered, &identity, &http).await;
+    let config = layered.effective().clone();
 
     let ws_url = config.ws_url(&identity.agent_id)?;
     let db = Arc::new(Mutex::new(db));
@@ -366,7 +379,7 @@ async fn run_async(
         chat_max_attempts: max_attempts,
         provisioner,
         engine_config_dir,
-        config: Mutex::new(config),
+        config: Mutex::new(layered),
         engine_settings: seams.claude,
         codex_settings: seams.codex,
         remote_ops,
@@ -534,11 +547,11 @@ fn watchdog_cfg(cfg: &ExecutorConfig) -> WatchdogCfg {
 /// which the reconcile version gate treats as non-authoritative (repair-only, never
 /// wipe).
 async fn fetch_and_apply_config(
-    config: &mut Config,
+    config: &mut LayeredConfig,
     identity: &ResolvedIdentity,
     http: &HttpClient,
 ) {
-    let url = match config.config_url(&identity.agent_id) {
+    let url = match config.effective().config_url(&identity.agent_id) {
         Ok(url) => url,
         Err(err) => {
             debug!(error = %err, "no config url; skipping startup config fetch");
@@ -559,10 +572,9 @@ async fn fetch_and_apply_config(
     if let Some(obj) = value.as_object_mut() {
         obj.remove("protocolVersion");
     }
-    match serde_json::from_value::<ConfigOverlay>(value) {
-        Ok(overlay) => {
-            info!(version = ?overlay.version(), "startup config fetched and applied");
-            config.apply(overlay);
+    match config.update(&value) {
+        Ok(applied) => {
+            info!(version = ?applied.config_version, "startup config fetched and applied");
         }
         Err(err) => {
             warn!(error = %err, "startup config payload did not parse; keeping register/bootstrap config");
@@ -986,10 +998,9 @@ struct ServeContext {
     /// The global scope root the provisioner materializes into (= the engine's
     /// `ENGINE_CONFIG_DIR`), re-reconciled live on `config_update`.
     engine_config_dir: PathBuf,
-    /// The merged live config. A WS `config_update` overlay lands here (the last
-    /// layer of the config.rs precedence chain) and drives the engine-settings
-    /// rebuild below.
-    config: Mutex<Config>,
+    /// The live config, its host layer kept apart. A WS `config_update` merges
+    /// into the host layer and drives the engine-settings rebuild below.
+    config: Mutex<LayeredConfig>,
     /// The live engine-settings seam: replaced on `config_update`,
     /// snapshotted by [`ReloadableEngine`] at every engine spawn.
     engine_settings: SharedEngineSettings,
@@ -1139,7 +1150,11 @@ async fn route(inbound: Inbound, context: &ServeContext) -> ControlFlow<()> {
             ControlFlow::Continue(())
         }
         InboundFrame::TaskDelete { task_id, .. } => {
-            let workspace_dir = lock(&context.config).paths.workspace_dir.clone();
+            let workspace_dir = lock(&context.config)
+                .effective()
+                .paths
+                .workspace_dir
+                .clone();
             applied = delete_task(&context.db, &workspace_dir, &task_id);
             ControlFlow::Continue(())
         }
@@ -1510,7 +1525,7 @@ async fn apply_config_update(context: &ServeContext, data: &serde_json::Value) {
             return;
         }
     };
-    apply_engine_config(context, overlay.clone());
+    apply_engine_config(context, data);
     apply_provisioning_update(context, &overlay).await;
 }
 
@@ -1522,23 +1537,31 @@ async fn apply_config_update(context: &ServeContext, data: &serde_json::Value) {
 /// apply-on-next-run decision). Fields the engine does not read at spawn time
 /// (heartbeat cadence, paths) are merged too but only take effect where they
 /// are re-read — the transport and DB keep their startup values until restart.
-fn apply_engine_config(context: &ServeContext, overlay: ConfigOverlay) {
+fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) {
     let (rebuilt, rebuilt_codex) = {
-        let mut config = lock(&context.config);
-        config.apply(overlay);
+        let mut layered = lock(&context.config);
+        let config = match layered.update(data) {
+            Ok(config) => config,
+            Err(err) => {
+                warn!(error = %err, "config_update left the host config unparseable; dropping");
+                return;
+            }
+        };
         context.remote_ops.configure(
             config.remote_ops.fs,
             config.remote_ops.pty,
             &config.paths.workspace_dir,
         );
         (
-            engine_settings(&config, &context.engine_config_dir),
-            codex_settings(&config, &context.engine_config_dir),
+            engine_settings(config, &context.engine_config_dir),
+            codex_settings(config, &context.engine_config_dir),
         )
     };
     *lock(&context.engine_settings) = rebuilt;
     *lock(&context.codex_settings) = rebuilt_codex;
-    debug!("config_update merged onto live config; engine settings apply on the next run");
+    debug!(
+        "config_update merged into the host config layer; engine settings apply on the next run"
+    );
 }
 
 /// Apply the provisioning side of a live `config_update` under the SAME

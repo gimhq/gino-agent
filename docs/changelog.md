@@ -87,3 +87,12 @@ builds only `v*` tags; lode-cli v0.4.0. The agent's `vm.kernel` / `vm.rootfs` / 
 to `LODE_RESOURCE_<NAME>` (agent-architecture §9e).
 Verification: agent fmt, clippy, deny, shear, nextest (954 passed); actionlint, shellcheck; local
 `lode-cli pull` (enforced signatures) of the three real assets, byte-identical to the builds.
+
+## 2026-11-02 00:30 [progress]
+
+Host config updates can clear fields: the runner keeps its own config apart from the host layer,
+the RFC 7386 merge patch of the register `config`, `GET /agent/config` and each `config_update`
+(`LayeredConfig`). A `null` removes the host's value and the runner's own value (e.g. the local
+login token) or the default applies to the next engine run without a restart; before, a removed
+endpoint or key stayed live until restart. protocol §3 and agent-architecture describe it.
+Verification: fmt, clippy, typos, nextest (958 passed), with a reproducing runner test.

@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 
 use secrecy::SecretString;
 use serde::Deserialize;
+use serde_json::{Map, Value};
 use thiserror::Error;
 use tracing::warn;
 
@@ -1017,6 +1018,68 @@ pub(crate) fn load_isolation_file(
     Ok(spec)
 }
 
+/// The agent's own config (bootstrap, env, local login token, identity) and the
+/// host layer kept apart. The host layer is the RFC 7386 merge of every host
+/// config payload (register `config`, `GET /agent/config`, `config_update`), so
+/// a `null` removes a value the host set and the agent's own value, or the
+/// default, applies again.
+#[derive(Clone, Debug)]
+pub(crate) struct LayeredConfig {
+    base: Config,
+    host: Value,
+    effective: Config,
+}
+
+impl LayeredConfig {
+    pub(crate) fn new(base: Config) -> Self {
+        Self {
+            effective: base.clone(),
+            base,
+            host: Value::Object(Map::new()),
+        }
+    }
+
+    /// The agent's config with the host layer applied.
+    pub(crate) fn effective(&self) -> &Config {
+        &self.effective
+    }
+
+    /// Merge a host config payload into the host layer and recompute the
+    /// effective config. A payload that leaves the layer unparseable changes
+    /// nothing.
+    pub(crate) fn update(&mut self, patch: &Value) -> Result<&Config, serde_json::Error> {
+        let mut host = self.host.clone();
+        merge_patch(&mut host, patch);
+        let overlay: ConfigOverlay = serde_json::from_value(host.clone())?;
+        let mut effective = self.base.clone();
+        effective.apply(overlay);
+        self.host = host;
+        self.effective = effective;
+        Ok(&self.effective)
+    }
+}
+
+/// RFC 7386 JSON merge patch: an object merges key by key (`null` removes the
+/// key), any other value replaces `target`.
+pub(crate) fn merge_patch(target: &mut Value, patch: &Value) {
+    let Value::Object(patch) = patch else {
+        *target = patch.clone();
+        return;
+    };
+    if !target.is_object() {
+        *target = Value::Object(Map::new());
+    }
+    if let Value::Object(target) = target {
+        for (key, value) in patch {
+            if value.is_null() {
+                target.remove(key);
+            } else {
+                merge_patch(target.entry(key.clone()).or_insert(Value::Null), value);
+            }
+        }
+    }
+}
+
 /// Apply the `engine.codex` overlay under the same omission-preserves rule as the
 /// rest of [`ConfigOverlay::apply`]: an absent field leaves the current value, and
 /// `extra_args` replaces wholesale when present (like `allowed_tools`).
@@ -1064,7 +1127,11 @@ mod tests {
 
     use secrecy::ExposeSecret;
 
-    use super::{Config, ConfigError, ConfigOverlay, load_isolation_file};
+    use serde_json::json;
+
+    use super::{
+        Config, ConfigError, ConfigOverlay, LayeredConfig, load_isolation_file, merge_patch,
+    };
     use crate::memory::{AgentMemoryAccess, TaskMemory};
     use crate::net::rules::RuleError;
     use crate::sandbox::{IsolationError, IsolationSpec};
@@ -2228,5 +2295,91 @@ mod tests {
             r#"{ "vm": { "kernel": "/evil/k", "rootfs": "/evil/r", "vmm": "/evil/v" } }"#,
         ));
         assert_eq!(config.engine.isolation, floor);
+    }
+
+    #[test]
+    fn merge_patch_keeps_absent_removes_null_merges_objects_and_replaces_the_rest() {
+        let mut target = json!({
+            "engine": { "anthropicBaseUrl": "https://proxy", "model": "m1", "allowedTools": ["a", "b"] },
+            "heartbeatIntervalMs": 1000
+        });
+        merge_patch(
+            &mut target,
+            &json!({ "engine": { "anthropicBaseUrl": null, "allowedTools": ["c"], "codex": { "model": "m2" } } }),
+        );
+        assert_eq!(
+            target,
+            json!({
+                "engine": { "model": "m1", "allowedTools": ["c"], "codex": { "model": "m2" } },
+                "heartbeatIntervalMs": 1000
+            })
+        );
+        merge_patch(&mut target, &json!({ "engine": null }));
+        assert_eq!(target, json!({ "heartbeatIntervalMs": 1000 }));
+    }
+
+    #[test]
+    fn a_host_null_falls_back_to_the_agent_own_value() {
+        let mut base = Config::default();
+        base.apply(ConfigOverlay::local_engine_oauth_token(
+            "local-token".to_owned(),
+        ));
+        let mut layered = LayeredConfig::new(base);
+
+        let config = layered
+            .update(&json!({ "engine": {
+                "anthropicBaseUrl": "https://proxy",
+                "anthropicApiKey": "sk-host",
+                "claudeCodeOauthToken": "host-token"
+            } }))
+            .unwrap();
+        assert_eq!(
+            config.engine.anthropic_base_url.as_deref(),
+            Some("https://proxy")
+        );
+        assert_eq!(
+            secret(config.engine.anthropic_api_key.as_ref()),
+            Some("sk-host")
+        );
+        assert_eq!(
+            secret(config.engine.claude_code_oauth_token.as_ref()),
+            Some("host-token")
+        );
+
+        // A later partial update keeps what it does not mention.
+        let config = layered
+            .update(&json!({ "engine": { "model": "m1" } }))
+            .unwrap();
+        assert_eq!(
+            config.engine.anthropic_base_url.as_deref(),
+            Some("https://proxy")
+        );
+
+        let config = layered
+            .update(&json!({ "engine": {
+                "anthropicBaseUrl": null,
+                "anthropicApiKey": null,
+                "claudeCodeOauthToken": null
+            } }))
+            .unwrap();
+        assert_eq!(config.engine.anthropic_base_url, None);
+        assert!(config.engine.anthropic_api_key.is_none());
+        assert_eq!(
+            secret(config.engine.claude_code_oauth_token.as_ref()),
+            Some("local-token")
+        );
+        assert_eq!(config.engine.model.as_deref(), Some("m1"));
+        assert_eq!(layered.effective().engine.model.as_deref(), Some("m1"));
+    }
+
+    #[test]
+    fn an_unparseable_host_update_changes_nothing() {
+        let mut layered = LayeredConfig::new(Config::default());
+        layered
+            .update(&json!({ "engine": { "model": "m1" } }))
+            .unwrap();
+        assert!(layered.update(&json!({ "engine": 5 })).is_err());
+        let config = layered.update(&json!({})).unwrap();
+        assert_eq!(config.engine.model.as_deref(), Some("m1"));
     }
 }
