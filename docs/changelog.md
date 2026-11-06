@@ -107,3 +107,9 @@ Codex runs now receive `CODEX_API_KEY` and `-c openai_base_url=...`, because `co
 publish a test image with fake engines from the new `e2e/`.
 Verification: fmt, clippy, unit tests (917 passed), e2e (29 passed); real codex-cli against a local
 401/403 endpoint. Not run: the `test-image` job and a joint run against a real host.
+
+## 2026-11-06 09:45 [progress]
+
+External hosts get `docs/host-quickstart.md`, walked through with `gino-mini-host` and the test
+image (fake claude and codex). Section 8 of the protocol is regenerated with `configVersion`, and
+`gino-agent/tests/protocol_schema.rs` now checks it against the runner's frames in this repo.

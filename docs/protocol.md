@@ -15,6 +15,7 @@ document* (and the protocol version) — nothing else.
 The model is **task / cron / thread**. It pairs with the data-plane spec
 [`docs/agent-architecture.md`](agent-architecture.md) (§10 transport, §12 identifiers) and
 the [e2ee specification](e2ee/spec.md). The runner types live in `gino-agent/src/protocol.rs`.
+New host implementers should start with the [host quickstart](host-quickstart.md).
 
 ## 1. Versioning
 
@@ -544,7 +545,8 @@ Parse model: a whole job is `WHERE task_id = ?`; one conversation is
 ## 8. Frame JSON Schema (generated)
 
 The machine-checkable JSON Schema for the frame catalog (§5). It is normative: a host
-implementation checks that its own frame catalog exports this schema. `AnyFrame` is
+implementation checks that its own frame catalog exports this schema, and
+`gino-agent/tests/protocol_schema.rs` checks it against the runner's frames. `AnyFrame` is
 the union of the agent→host (`AgentFrame`) and host→agent (`HostFrame`) catalogs; both are
 also exposed under `$defs`. Frames and their `data` objects are **open** — additive fields
 validate (protocol §1/§4.2) — while an unknown `type` matches no member and is rejected.
@@ -936,11 +938,6 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     "additionalProperties": {}
                   }
                 },
-                "configVersion": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
                 "e2ee": {
                   "type": "object",
                   "properties": {
@@ -985,6 +982,11 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     "credential"
                   ],
                   "additionalProperties": {}
+                },
+                "configVersion": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": {}
@@ -2707,11 +2709,6 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     "additionalProperties": {}
                   }
                 },
-                "configVersion": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
                 "e2ee": {
                   "type": "object",
                   "properties": {
@@ -2756,6 +2753,11 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     "credential"
                   ],
                   "additionalProperties": {}
+                },
+                "configVersion": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": {}

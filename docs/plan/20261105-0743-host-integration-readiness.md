@@ -40,7 +40,8 @@
   item 5 (`e2e/` assets, `test-image` job in `release.yml`).
 - Open: runner-settings, `defaults` and `usage` need a spec or `a476843`. `frames.ts` in
   `gimhq/gino` needs `configVersion`, and `gino-agent.ref` a bump, after this is pushed.
-- Not run: the `test-image` job and a joint run against a real host.
+- Joint run done with `gino-mini-host` and a locally built test image. Not run: the `test-image`
+  job, and a joint run against bks.
 
 ## Audit Findings
 
