@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# Fake "codex" engine for the gino docker e2e.
+#
+# The gino-agent's codex backend spawns a `codex` binary from PATH as
+# `codex exec --json …`, writes the prompt to its stdin, CLOSES the pipe and
+# reads JSONL ThreadEvents off stdout (see gino-agent/src/engine/codex). This
+# script is a deterministic, network-free stand-in that speaks exactly the lines
+# `codex::events::map_line` parses — the codex twin of `fake-claude`, modelled on
+# the test-harness fake at gino-agent/tests/support/fake_codex.rs:
+#
+#   1. `thread.started`                    → runner SessionStarted (the resume
+#                                            handle, mirrored as engineSessionId)
+#   2. `turn.started`                      → nothing (dropped by the mapper)
+#   3. `item.completed` `reasoning`        → runner Thinking → host `thinking`
+#   4. `item.started` `command_execution`  → runner ToolUse → host `tool_use`
+#   5. `item.completed` for the SAME id    → runner ToolResult → host `tool_result`
+#   6. `item.completed` `agent_message`    → runner Output → host `assistant_text`
+#   7. `turn.completed`                    → runner Result → host thread_result(succeeded)
+#
+# Every item carries `item_type` — that is the field the mapper reads first to
+# classify an item — and the tool call's id is fixed so the e2e can pin it.
+#
+# It additionally drains stdin to recover the prompt the runner writes in and
+# echoes it back, so the e2e can assert a full host→ws→runner→engine→ws→host
+# content round-trip. Codex reports no sub-agent linkage, so nothing here carries
+# a parent_tool_use_id — the e2e asserts that absence.
+set -u
+
+# The thread id this turn runs under. A real `codex exec` resumes a thread when
+# the runner appends `resume <thread_id>` LAST on the argv, so honour that and
+# reuse the id rather than minting a fresh one (no assertion depends on it; the
+# fake simply must not contradict the real CLI).
+TID="codex-e2e-$$"
+# Mirror the real CLI's ARGUMENT STRICTNESS, not just its output: codex-cli
+# 0.154.0 accepts `--ask-for-approval` only BEFORE the `exec` subcommand and
+# exits with `error: unexpected argument` otherwise. A permissive stub hides
+# exactly that class of bug (it did once), so reject anything the real binary
+# would reject.
+seen_exec=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    exec) seen_exec=1 ;;
+    resume)
+      if [ $# -ge 2 ]; then TID="$2"; fi
+      ;;
+    --ask-for-approval)
+      if [ "$seen_exec" = "1" ]; then
+        echo "error: unexpected argument '--ask-for-approval' found" >&2
+        echo "Usage: codex exec [OPTIONS] [PROMPT]" >&2
+        exit 2
+      fi
+      shift
+      ;;
+    --json|--skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox) ;;
+    --model|--sandbox|-C|--cd) shift ;;
+    -*)
+      echo "error: unexpected argument '$1' found" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+# Drain stdin to capture the prompt. `read -t 1` returns non-zero on both EOF and
+# timeout; the runner writes the prompt then closes the pipe, so stop at the
+# first failed read once something arrived, and bound the whole wait to ~5s so a
+# run can never hang.
+prompt=""
+deadline=$(( $(date +%s) + 5 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  if IFS= read -r -t 1 line; then
+    prompt="${prompt:+$prompt }$line"
+  elif [ -n "$prompt" ]; then
+    break
+  fi
+done
+
+reply="gino-e2e codex ok"
+[ -n "$prompt" ] && reply="gino-e2e codex ok: ${prompt}"
+
+emit() { printf '%s\n' "$1"; }
+
+CMD_ID="item_e2e_cmd_1"
+
+# 1) The session announcement — this id becomes the thread's engineSessionId.
+emit "$(jq -cn --arg t "$TID" '{type:"thread.started",thread_id:$t}')"
+
+# 2) Turn open.
+emit '{"type":"turn.started"}'
+
+# 3) Reasoning → the `thinking` transcript row.
+emit "$(jq -cn '{type:"item.completed",item:{
+  id:"item_e2e_reasoning_1",item_type:"reasoning",text:"gino-e2e codex thinking"}}')"
+
+# 4/5) One command_execution item, opened then completed under the SAME id: the
+#      mapper forwards the item kind as the tool name and the whole item (minus
+#      the envelope keys) as the tool input / result content.
+emit "$(jq -cn --arg id "$CMD_ID" '{type:"item.started",item:{
+  id:$id,item_type:"command_execution",command:"echo gino-e2e"}}')"
+
+emit "$(jq -cn --arg id "$CMD_ID" '{type:"item.completed",item:{
+  id:$id,item_type:"command_execution",command:"echo gino-e2e",
+  exit_code:0,aggregated_output:"gino-e2e"}}')"
+
+# 6) The assistant message — jq builds valid JSON regardless of prompt contents.
+emit "$(jq -cn --arg t "$reply" '{type:"item.completed",item:{
+  id:"item_e2e_msg_1",item_type:"agent_message",text:$t}}')"
+
+# 7) Terminal success — the mapper folds in the remembered thread id + last message.
+emit '{"type":"turn.completed"}'

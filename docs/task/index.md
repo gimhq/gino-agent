@@ -1,6 +1,6 @@
 # gino-agent - Task List
 
-> Updated: 2026-10-27
+> Updated: 2026-11-05
 
 ## Usage
 
@@ -38,3 +38,4 @@ Each task is a single line linking to its detail file. All detailed information 
 - [ ] [**20261027-0613-chunk-block-storage Chunk-based block storage engine**](20261027-0613-chunk-block-storage.md) `P2`
 - [x] [**20261028-0050-vm-image-release Kernel, vmm and rootfs release channels with lode**](20261028-0050-vm-image-release.md) `P1`
 - [x] [**20261101-1538-config-update-clear Host config updates can clear fields**](20261101-1538-config-update-clear.md) `P1`
+- [-] [**20261105-0743-host-integration-readiness Single agent source and host integration readiness**](20261105-0743-host-integration-readiness.md) `P1`

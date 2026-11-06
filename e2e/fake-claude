@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Fake "claude" engine for the gino docker e2e.
+#
+# The gino-agent's only engine spawns a `claude` binary from PATH and drives it
+# over the bkd stream-json control protocol (see gino-agent/src/engine/claude).
+# This script is a deterministic, network-free stand-in that speaks exactly the
+# lines `events::map_line` parses — modelled on the test harness fake at
+# gino-agent/tests/support/fake_claude.rs:
+#
+#   1. a `system/init`  line               → runner SessionStarted
+#   2. one `assistant` text block          → runner Output → host thread_message
+#   3. a sub-agent sequence, so the e2e can assert `tool_use_id` /
+#      `parent_tool_use_id` attribution end to end (protocol §5):
+#        3a. an `assistant` `tool_use` block spawning the `Task` sub-agent, with
+#            NO top-level `parent_tool_use_id` (the MAIN agent spawns it)
+#        3b. an `assistant` text block carrying `parent_tool_use_id` = that
+#            tool-use id (the SUB-AGENT talking)
+#        3c. a `user` `tool_result` block closing the same tool-use id, back on
+#            the main agent (top-level `parent_tool_use_id` null)
+#   4. a terminal `result`/success line    → runner Result → host thread_result(succeeded)
+#
+# It additionally drains stdin to recover the user prompt the runner streams in
+# (control_request `initialize`, `set_permission_mode`, then a `user` turn) and
+# echoes it back, so the e2e can assert a full host→ws→runner→engine→ws→host
+# content round-trip. The reply ends with a marker reporting whether the runner
+# exported the task/agent memory directories (`memory-env task=set|unset
+# agent=set|unset`) and the claude auto memory state it was launched with
+# (`automem=dir|off|unset`: an `autoMemoryDirectory` ending in `/claude` in
+# `--settings`, or `autoMemoryEnabled:false` plus
+# `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`), so the e2e can assert the effective
+# memory settings.
+set -u
+
+settings="{}"
+prev=""
+for arg in "$@"; do
+  [ "$prev" = "--settings" ] && settings="$arg"
+  prev="$arg"
+done
+automem="$(printf '%s' "$settings" | jq -r --arg off "${CLAUDE_CODE_DISABLE_AUTO_MEMORY:-}" '
+  if (.autoMemoryDirectory // "" | endswith("/claude")) then "dir"
+  elif .autoMemoryEnabled == false and $off == "1" then "off"
+  else "unset" end' 2>/dev/null || echo unset)"
+
+SID="sess-e2e-$$"
+
+emit() { printf '%s\n' "$1"; }
+
+# 1) Announce the session immediately (before reading stdin) so the runner's
+#    reader sees SessionStarted and proceeds to stream the user turn in.
+emit "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"${SID}\",\"model\":\"fake-e2e\",\"tools\":[]}"
+
+# 2) Drain stdin briefly to capture the user prompt. `read -t 1` returns non-zero
+#    on both timeout and EOF; bound the whole wait to ~5s so a run can never hang.
+prompt=""
+deadline=$(( $(date +%s) + 5 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  if IFS= read -r -t 1 line; then
+    case "$line" in
+      *'"type":"user"'*)
+        prompt="$(printf '%s' "$line" | jq -r '
+          .message.content
+          | if type=="string" then .
+            elif type=="array" then (map(select(.type=="text").text) | join(" "))
+            else tostring end' 2>/dev/null || true)"
+        break
+        ;;
+    esac
+  fi
+done
+
+reply="gino-e2e ok"
+[ -n "$prompt" ] && reply="gino-e2e ok: ${prompt}"
+reply="${reply} memory-env task=$([ -n "${GINO_MEMORY_DIR:-}" ] && echo set || echo unset) agent=$([ -n "${GINO_AGENT_MEMORY_DIR:-}" ] && echo set || echo unset) automem=${automem}"
+
+# 3) Assistant text block — jq builds valid JSON regardless of prompt contents.
+emit "$(jq -cn --arg t "$reply" \
+  '{type:"assistant",message:{role:"assistant",content:[{type:"text",text:$t}]}}')"
+
+# 4) Sub-agent sequence — a `Task` tool_use spawned by the main agent, the
+#    sub-agent's own text (attributed by parent_tool_use_id) and the tool_result
+#    that returns to the main agent. The tool-use id is fixed so the e2e can pin it.
+TASK_ID="toolu_e2e_task_1"
+
+emit "$(jq -cn --arg id "$TASK_ID" \
+  '{type:"assistant",message:{role:"assistant",content:[
+      {type:"tool_use",id:$id,name:"Task",
+       input:{description:"e2e sub-agent probe",prompt:"say hello"}}]}}')"
+
+emit "$(jq -cn --arg id "$TASK_ID" \
+  '{type:"assistant",parent_tool_use_id:$id,message:{role:"assistant",content:[
+      {type:"text",text:"gino-e2e subagent ok"}]}}')"
+
+emit "$(jq -cn --arg id "$TASK_ID" \
+  '{type:"user",parent_tool_use_id:null,message:{role:"user",content:[
+      {type:"tool_result",tool_use_id:$id,content:"gino-e2e subagent result",is_error:false}]}}')"
+
+# 5) Terminal success result — carries the session id (the resume handle).
+emit "$(jq -cn --arg s "$SID" --arg r "$reply" \
+  '{type:"result",subtype:"success",is_error:false,result:$r,session_id:$s}')"

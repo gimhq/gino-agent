@@ -62,8 +62,9 @@ pub(crate) enum RunStatus {
 }
 
 /// Structured cause of an errored turn, derived from the backend's structured
-/// result fields (Claude's `result.subtype`) — never from the result prose,
-/// which is (or quotes) model output and must not drive policy. `None` on an
+/// result fields (Claude's `result.subtype`) or a client's own anchored error
+/// format — never from result prose, which is (or quotes) model output and must
+/// not drive policy. `None` on an
 /// errored [`RunOutcome`] means the backend reported no structured cause the
 /// runner recognises.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,6 +74,8 @@ pub(crate) enum RunErrorKind {
     /// The engine reported a generic in-run failure (`error_during_execution`)
     /// with no more specific structured cause.
     Execution,
+    /// The provider rejected the engine's credentials (401/403).
+    Auth,
 }
 
 /// Severity of an [`EngineEvent::Log`] line.

@@ -267,7 +267,7 @@ by **meta** (engine-agnostic), loaded by **symlink** from one store.
   `version`** served on register / `GET /agent/config` / `config_update`. At startup the runner fetches
   `GET /agent/config` (authoritative — a restart reuses its identity, so the register response no longer
   carries the desired set) and reconciles the global scope **only when the version advances** past the applied
-  version (persisted in a durable `config_meta` KV); same/absent version ⇒ **repair-only** (store + manifest
+  version (persisted in a durable `config_meta` KV); same/absent version or absent `entries` ⇒ **repair-only** (store + manifest
   survive). A *versioned* empty set removes all (authoritative-empty); a *non-versioned / offline* empty set
   never wipes. The task scope is restart-durable already (it persists via `tasks.entries` + `config_entries`).
 
@@ -315,7 +315,7 @@ result still held when the child exits is reported as it is.
 | `item.completed` for those same kinds | `ToolResult` | `tool_result` |
 | `item.completed` `error` | `Log` (error) | a log line — **not** terminal |
 | `turn.completed` | `Result` (success) | `thread_result` succeeded |
-| `turn.failed` | `Result` (error, `Execution` → `agent.unknown`) | `thread_result` failed |
+| `turn.failed` | `Result` (error, `Auth` → `agent.provider_auth` on a 401/403 from the client, else `Execution` → `agent.unknown`) | `thread_result` failed |
 | `error` (stream-level, e.g. a reconnect notice) | `Log` (warn) | a status line — **not** terminal |
 | `item.updated`, `todo_list`, anything unknown | — | dropped |
 
@@ -333,8 +333,8 @@ it. The cancelled turn settles through the existing executor path: the child die
 stream ends, and `drain_cancelled` settles the thread `cancelled`.
 
 **Config.** The `engine.codex` block — `binary`, `model`, `approvalPolicy`, `sandboxMode`,
-`skipGitRepoCheck`, `extraArgs`, plus `openaiApiKey` / `openaiBaseUrl` (handed to the child as
-`OPENAI_API_KEY` / `OPENAI_BASE_URL`) — is additive: an absent field leaves the backend default in place. The
+`skipGitRepoCheck`, `extraArgs`, plus `openaiApiKey` / `openaiBaseUrl` (handed to the child as the
+`CODEX_API_KEY` env and a `-c openai_base_url=...` override, the forms `codex exec` reads) — is additive: an absent field leaves the backend default in place. The
 provisioned engine config dir (§9b) is exported to a codex child as `ENGINE_CONFIG_DIR` + **`CODEX_HOME`**,
 the way it is `ENGINE_CONFIG_DIR` + `CLAUDE_CONFIG_DIR` for claude.
 

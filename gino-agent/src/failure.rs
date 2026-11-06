@@ -24,10 +24,12 @@
 //! [`classify_outcome`] maps a turn's *structured* error cause (the engine's
 //! parsed `result.subtype`, carried as [`RunErrorKind`]) into a reason;
 //! [`classify_engine_error`] does the same for process-level [`EngineError`]s.
-//! Error *prose* is never consulted — it is (or quotes) model output, and
+//! Error *prose* is not consulted here — it is (or quotes) model output, and
 //! substring matching against it misclassifies ordinary text ("took 1500ms",
 //! "400") into policy-changing reasons. Callers that *know* the cause
-//! (the watchdog setting `runner.timeout`) construct the reason directly.
+//! (the watchdog setting `runner.timeout`) construct the reason directly. An
+//! engine mapper may set a [`RunErrorKind`] from text only when that text is the
+//! client's own anchored error format, as the codex mapper does for 401/403.
 //!
 //! Several reasons are part of the spec §6 wire taxonomy but have no
 //! constructing code path yet (nothing detects them); those carry per-variant
@@ -57,8 +59,9 @@ pub(crate) enum RunnerFailure {
 
 /// An `agent.*` failure — the engine/provider side failed. Not retryable.
 ///
-/// Only [`ProcessFailure`](Self::ProcessFailure), [`Encryption`](Self::Encryption)
-/// and [`Unknown`](Self::Unknown) have constructing code paths today: the
+/// Only [`ProcessFailure`](Self::ProcessFailure), [`Encryption`](Self::Encryption),
+/// [`ProviderAuth`](Self::ProviderAuth) and [`Unknown`](Self::Unknown) have
+/// constructing code paths today: the
 /// engine reports no structured cause finer than `RunErrorKind`, so the
 /// provider-specific reasons cannot be detected without prose-matching
 /// (banned). They stay declared (wire
@@ -66,10 +69,6 @@ pub(crate) enum RunnerFailure {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AgentFailure {
     /// Authentication rejected (bad/expired API key, 401/403).
-    #[allow(
-        dead_code,
-        reason = "spec §6 wire taxonomy; no structured detector yet"
-    )]
     ProviderAuth,
     /// Out of quota / credit / billing rejected the call.
     #[allow(
@@ -206,6 +205,7 @@ impl std::fmt::Display for FailureReason {
 pub(crate) fn classify_outcome(kind: Option<RunErrorKind>) -> FailureReason {
     match kind {
         Some(RunErrorKind::MaxTurns) => FailureReason::Runner(RunnerFailure::IterationLimit),
+        Some(RunErrorKind::Auth) => FailureReason::Agent(AgentFailure::ProviderAuth),
         // Fallback policy: an engine-reported error with no more specific
         // structured cause (a generic `error_during_execution`, an unrecognised
         // subtype, `is_error` on a success subtype) folds into `agent.unknown` —
@@ -312,6 +312,10 @@ mod tests {
             (
                 Some(RunErrorKind::Execution),
                 FailureReason::Agent(AgentFailure::Unknown),
+            ),
+            (
+                Some(RunErrorKind::Auth),
+                FailureReason::Agent(AgentFailure::ProviderAuth),
             ),
             (None, FailureReason::Agent(AgentFailure::Unknown)),
         ];

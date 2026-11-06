@@ -123,7 +123,7 @@ async fn build_execution_plane_wires_the_transport_flush() {
     let dir = tempfile::tempdir().unwrap();
     let cancel = Arc::new(crate::scheduler::Cancel::new());
     let flush = Arc::new(tokio::sync::Notify::new());
-    let (executor, _provisioner, _settings) = super::build_execution_plane(
+    let (executor, _provisioner, _settings, _) = super::build_execution_plane(
         &crate::config::Config::default(),
         &http,
         &db,
@@ -147,7 +147,7 @@ async fn serve_context(db: Arc<Mutex<Db>>, dir: &std::path::Path) -> ServeContex
     config.paths.workspace_dir = dir.to_path_buf();
     let remote_ops = Arc::new(crate::remote_ops::RemoteOps::new(false, dir));
     let e2ee = test_e2ee(&db, dir);
-    let (executor, provisioner, settings) = super::build_execution_plane(
+    let (executor, provisioner, settings, _) = super::build_execution_plane(
         &config,
         &http,
         &db,
@@ -167,6 +167,7 @@ async fn serve_context(db: Arc<Mutex<Db>>, dir: &std::path::Path) -> ServeContex
         provisioner,
         engine_config_dir: dir.to_path_buf(),
         config: Mutex::new(crate::config::LayeredConfig::new(config)),
+        config_version: Arc::default(),
         engine_settings: settings.claude,
         codex_settings: settings.codex,
         remote_ops,

@@ -568,6 +568,9 @@ pub(crate) mod frames {
         /// The same e2ee capability object as on register.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) e2ee: Option<E2eeCapability>,
+        /// The last host config `version` the runner applied.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub(crate) config_version: Option<i64>,
     }
 
     // -----------------------------------------------------------------------
@@ -1265,6 +1268,7 @@ pub(crate) mod frames {
                         capabilities: Vec::new(),
                         engines: Vec::new(),
                         e2ee: None,
+                        config_version: None,
                     },
                     outbox_id: None,
                 })
@@ -1282,6 +1286,7 @@ pub(crate) mod frames {
                         capabilities: vec!["claude".to_owned(), "sandbox".to_owned()],
                         engines: Vec::new(),
                         e2ee: None,
+                        config_version: None,
                     },
                     outbox_id: Some(did(1)),
                 },
@@ -1299,6 +1304,7 @@ pub(crate) mod frames {
                     capabilities: vec!["claude".to_owned()],
                     engines: Vec::new(),
                     e2ee: Some(E2eeCapability::basic("cGs".to_owned())),
+                    config_version: None,
                 },
                 outbox_id: None,
             };

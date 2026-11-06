@@ -261,11 +261,13 @@ async fn run_async(
     let db = Arc::new(Mutex::new(db));
     let (e2ee_live_tx, e2ee_live_rx) = mpsc::unbounded_channel();
     let e2ee_ds = Arc::new(DsLink::default());
+    let config_version = Arc::new(Mutex::new(config.config_version));
     let transport_config = TransportConfig {
         heartbeat: Duration::from_millis(config.heartbeat_interval_ms),
         capabilities,
         engines,
         e2ee: Some(e2ee_capability),
+        config_version: Arc::clone(&config_version),
         e2ee_live: Some(e2ee_live_tx),
         e2ee_ds: Some(Arc::clone(&e2ee_ds)),
         ..TransportConfig::default()
@@ -335,7 +337,7 @@ async fn run_async(
     let _ = shutdown.as_mut().now_or_never();
     // Started before the executor so runs can be handed its token registry.
     let api = start_agent_api(&config, &db, &nudge, &flush, &e2ee);
-    let (executor, provisioner, seams) = build_execution_plane(
+    let (executor, provisioner, seams, config_settled) = build_execution_plane(
         &config,
         &http,
         &db,
@@ -346,6 +348,9 @@ async fn run_async(
         &e2ee,
     )
     .await;
+    if !config_settled {
+        *lock(&config_version) = None;
+    }
     let prompts = Arc::new(InboxPromptSource {
         db: Arc::clone(&db),
     });
@@ -380,6 +385,7 @@ async fn run_async(
         provisioner,
         engine_config_dir,
         config: Mutex::new(layered),
+        config_version,
         engine_settings: seams.claude,
         codex_settings: seams.codex,
         remote_ops,
@@ -604,7 +610,12 @@ async fn build_execution_plane(
     flush: Arc<Notify>,
     api: Option<&AgentApiServer>,
     e2ee: &Arc<E2ee>,
-) -> (Arc<ThreadExecutor>, Option<Arc<Provisioner>>, EngineSeams) {
+) -> (
+    Arc<ThreadExecutor>,
+    Option<Arc<Provisioner>>,
+    EngineSeams,
+    bool,
+) {
     let seams = EngineSeams {
         claude: Arc::new(Mutex::new(engine_settings(config, engine_config_dir))),
         codex: Arc::new(Mutex::new(codex_settings(config, engine_config_dir))),
@@ -643,17 +654,20 @@ async fn build_execution_plane(
         None => executor,
     });
 
-    if let Some(provisioner) = &provisioner {
-        reconcile_global_startup(
-            provisioner,
-            db,
-            engine_config_dir,
-            &config.entries,
-            config.config_version,
-        )
-        .await;
-    }
-    (executor, provisioner, seams)
+    let config_settled = match &provisioner {
+        Some(provisioner) => {
+            reconcile_global_startup(
+                provisioner,
+                db,
+                engine_config_dir,
+                config.entries.as_deref(),
+                config.config_version,
+            )
+            .await
+        }
+        None => config.entries.is_none(),
+    };
+    (executor, provisioner, seams, config_settled)
 }
 
 /// Build the v2 [`ThreadExecutor`] and (when present) wire its out-of-band
@@ -902,15 +916,16 @@ fn build_attachment_manager(config: &Config, http: &HttpClient) -> Option<Arc<At
 /// symlink + row (because `config.entries` was empty on a restart) and then let `gc`
 /// collect the orphaned store.
 ///
-/// * **authoritative new** — `fetched` is `Some` and `> applied` (incl. the first
-///   versioned set, when `applied` is `None`): reconcile the global scope to
+/// * **authoritative new** — `entries` is `Some` and `fetched` is `Some` and
+///   `> applied` (incl. the first versioned set, when `applied` is `None`): reconcile the global scope to
 ///   `entries` — add / repoint / **delete** to match the desired set, *including
 ///   removing all when `entries` is empty* (the authoritative-empty case: a versioned
 ///   empty set means the host genuinely wants none). The applied version is persisted
 ///   only after a SUCCESSFUL reconcile, so a transient failure re-reconciles on the
 ///   next restart rather than being masked as already-applied.
-/// * **same version** (`fetched == applied`) or **non-authoritative** (`fetched` is
-///   `None` — no version served / fetch failed / offline): NEVER reconcile-to-empty.
+/// * **same version** (`fetched == applied`) or **non-authoritative** (`fetched` or
+///   `entries` is `None` — no versioned set served / fetch failed / offline): NEVER
+///   reconcile-to-empty.
 ///   The installed set is left intact.
 ///
 /// `repair` and `gc` run in **every** branch — `repair` recreates symlinks a restart
@@ -922,22 +937,24 @@ async fn reconcile_global_startup(
     provisioner: &Provisioner,
     db: &Mutex<Db>,
     engine_config_dir: &Path,
-    entries: &[ProvisioningEntry],
+    entries: Option<&[ProvisioningEntry]>,
     fetched_version: Option<i64>,
-) {
+) -> bool {
     let applied = lock_db(db)
         .get_applied_global_version()
         .unwrap_or_else(|err| {
             warn!(error = %err, "failed to read applied global config version; treating as unset");
             None
         });
-    // Authoritative-new ⇔ a version is served AND it advances past what we applied
-    // (an absent applied version is the never-reconciled / fresh-DB case).
-    let authoritative_new =
-        matches!(fetched_version, Some(fetched) if applied.is_none_or(|a| fetched > a));
+    // Authoritative-new ⇔ a desired set is served AND its version advances past what
+    // we applied (an absent applied version is the never-reconciled / fresh-DB case).
+    let desired = entries.filter(
+        |_| matches!(fetched_version, Some(fetched) if applied.is_none_or(|a| fetched > a)),
+    );
 
+    let reconcile_wanted = desired.is_some();
     let mut reconciled_ok = false;
-    if authoritative_new {
+    if let Some(entries) = desired {
         match provisioner
             .reconcile("global", engine_config_dir, entries)
             .await
@@ -980,6 +997,8 @@ async fn reconcile_global_startup(
     if let Err(err) = provisioner.gc().await {
         warn!(error = %err, "startup provisioning gc failed (continuing)");
     }
+
+    !reconcile_wanted || reconciled_ok
 }
 
 /// Shared handles the serve loop hands to the inbound router.
@@ -1001,6 +1020,8 @@ struct ServeContext {
     /// The live config, its host layer kept apart. A WS `config_update` merges
     /// into the host layer and drives the engine-settings rebuild below.
     config: Mutex<LayeredConfig>,
+    /// The applied config version heartbeats report.
+    config_version: Arc<Mutex<Option<i64>>>,
     /// The live engine-settings seam: replaced on `config_update`,
     /// snapshotted by [`ReloadableEngine`] at every engine spawn.
     engine_settings: SharedEngineSettings,
@@ -1525,8 +1546,12 @@ async fn apply_config_update(context: &ServeContext, data: &serde_json::Value) {
             return;
         }
     };
-    apply_engine_config(context, data);
-    apply_provisioning_update(context, &overlay).await;
+    let merged = apply_engine_config(context, data);
+    let settled = apply_provisioning_update(context, &overlay).await;
+    if merged && settled {
+        let mut reported = lock(&context.config_version);
+        *reported = (*reported).max(overlay.version());
+    }
 }
 
 /// Merge a `config_update` overlay onto the live [`Config`] (the "WS update"
@@ -1537,14 +1562,14 @@ async fn apply_config_update(context: &ServeContext, data: &serde_json::Value) {
 /// apply-on-next-run decision). Fields the engine does not read at spawn time
 /// (heartbeat cadence, paths) are merged too but only take effect where they
 /// are re-read — the transport and DB keep their startup values until restart.
-fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) {
+fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) -> bool {
     let (rebuilt, rebuilt_codex) = {
         let mut layered = lock(&context.config);
         let config = match layered.update(data) {
             Ok(config) => config,
             Err(err) => {
                 warn!(error = %err, "config_update left the host config unparseable; dropping");
-                return;
+                return false;
             }
         };
         context.remote_ops.configure(
@@ -1562,6 +1587,7 @@ fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) {
     debug!(
         "config_update merged into the host config layer; engine settings apply on the next run"
     );
+    true
 }
 
 /// Apply the provisioning side of a live `config_update` under the SAME
@@ -1576,14 +1602,16 @@ fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) {
 /// applied version is persisted only after a successful reconcile. Unlike the startup
 /// path this does NOT gc — orphaned store versions are collected on the next restart's
 /// startup gc, matching the documented "no GC without a restart". Non-fatal.
-async fn apply_provisioning_update(context: &ServeContext, overlay: &ConfigOverlay) {
+///
+/// Returns whether the overlay's desired set, if it has one, is in place.
+async fn apply_provisioning_update(context: &ServeContext, overlay: &ConfigOverlay) -> bool {
     let Some(provisioner) = &context.provisioner else {
-        return;
+        return overlay.entries().is_none();
     };
     // The version gate keys on a (version, entries) pair: a versioned desired set.
     let (Some(fetched), Some(entries)) = (overlay.version(), overlay.entries()) else {
         debug!("config_update without a version+entries pair; leaving global provisioning intact");
-        return;
+        return true;
     };
     let applied = lock_db(&context.db)
         .get_applied_global_version()
@@ -1597,7 +1625,7 @@ async fn apply_provisioning_update(context: &ServeContext, overlay: &ConfigOverl
             fetched,
             "config_update version not advanced; ignoring (repair-only on restart)"
         );
-        return;
+        return applied == Some(fetched);
     }
     match provisioner
         .reconcile("global", &context.engine_config_dir, entries)
@@ -1612,8 +1640,12 @@ async fn apply_provisioning_update(context: &ServeContext, overlay: &ConfigOverl
             if let Err(err) = lock_db(&context.db).set_applied_global_version(fetched) {
                 warn!(error = %err, "failed to persist applied global config version after config_update");
             }
+            true
         }
-        Err(err) => warn!(error = %err, "config_update global reconcile failed"),
+        Err(err) => {
+            warn!(error = %err, "config_update global reconcile failed");
+            false
+        }
     }
 }
 
@@ -1711,7 +1743,7 @@ mod provisioning_wiring_tests {
         std::fs::create_dir_all(&engine_config_dir).unwrap();
         let (prov, db, _fetches) = provisioner_with(ws.path(), HashMap::new());
 
-        reconcile_global_startup(&prov, &db, &engine_config_dir, &[], Some(1)).await;
+        reconcile_global_startup(&prov, &db, &engine_config_dir, Some(&[]), Some(1)).await;
 
         assert!(
             std::fs::read_dir(&engine_config_dir)
@@ -1748,7 +1780,7 @@ mod provisioning_wiring_tests {
             &prov,
             &db,
             &engine_config_dir,
-            std::slice::from_ref(&entry),
+            Some(std::slice::from_ref(&entry)),
             Some(1),
         )
         .await;
@@ -1791,7 +1823,7 @@ mod provisioning_wiring_tests {
             &prov,
             &db,
             &engine_config_dir,
-            std::slice::from_ref(&entry),
+            Some(std::slice::from_ref(&entry)),
             Some(1),
         )
         .await;
@@ -1799,7 +1831,7 @@ mod provisioning_wiring_tests {
         assert_eq!(lock_applied(&db), Some(1));
 
         // v2 with an EMPTY set is authoritative-empty → removes the installed entry.
-        reconcile_global_startup(&prov, &db, &engine_config_dir, &[], Some(2)).await;
+        reconcile_global_startup(&prov, &db, &engine_config_dir, Some(&[]), Some(2)).await;
         assert!(
             std::fs::read_dir(&engine_config_dir)
                 .unwrap()
@@ -1833,7 +1865,7 @@ mod provisioning_wiring_tests {
             &prov,
             &db,
             &engine_config_dir,
-            std::slice::from_ref(&entry),
+            Some(std::slice::from_ref(&entry)),
             Some(1),
         )
         .await;
@@ -1843,7 +1875,7 @@ mod provisioning_wiring_tests {
 
         // Simulate a restart whose config fetch FAILED (no version) handing an EMPTY
         // desired set: the installed entry must survive (no reconcile-to-empty).
-        reconcile_global_startup(&prov, &db, &engine_config_dir, &[], None).await;
+        reconcile_global_startup(&prov, &db, &engine_config_dir, Some(&[]), None).await;
         assert!(
             link.is_symlink() && std::fs::read(&link).unwrap() == bytes,
             "a non-authoritative empty set must never wipe the installed global entry"
@@ -1878,7 +1910,7 @@ mod provisioning_wiring_tests {
             &prov,
             &db,
             &engine_config_dir,
-            std::slice::from_ref(&entry),
+            Some(std::slice::from_ref(&entry)),
             Some(1),
         )
         .await;
@@ -1890,7 +1922,7 @@ mod provisioning_wiring_tests {
             &prov,
             &db,
             &engine_config_dir,
-            std::slice::from_ref(&entry),
+            Some(std::slice::from_ref(&entry)),
             Some(1),
         )
         .await;

@@ -96,3 +96,14 @@ the RFC 7386 merge patch of the register `config`, `GET /agent/config` and each 
 login token) or the default applies to the next engine run without a restart; before, a removed
 endpoint or key stayed live until restart. protocol §3 and agent-architecture describe it.
 Verification: fmt, clippy, typos, nextest (958 passed), with a reproducing runner test.
+
+## 2026-11-06 09:30 [progress]
+
+Host integration readiness. A config overlay may carry `version` with or without `entries`:
+absent `entries` no longer clears the global set on restart, and heartbeats report the last
+applied version as `configVersion`, held back while the overlay's desired set is not in place.
+Codex runs now receive `CODEX_API_KEY` and `-c openai_base_url=...`, because `codex exec` ignores
+`OPENAI_API_KEY` and `OPENAI_BASE_URL`. A codex 401 or 403 reports `agent.provider_auth`. Releases
+publish a test image with fake engines from the new `e2e/`.
+Verification: fmt, clippy, unit tests (917 passed), e2e (29 passed); real codex-cli against a local
+401/403 endpoint. Not run: the `test-image` job and a joint run against a real host.

@@ -152,3 +152,38 @@ jobs:
           gh release upload "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" \
             "agent-dist/${AGENT_ASSET}" "agent-dist/${AGENT_ASSET}.sha256" agent-dist/*.sig \
             --clobber
+
+  # The published agent plus fake engines, for host joint testing. Built from the
+  # release asset, so it tests exactly what shipped.
+  test-image:
+    name: test image (fake engines)
+    needs: [publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Stage the released agent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" -p "${AGENT_ASSET}"
+          tar -xzf "${AGENT_ASSET}" gino-agent
+          mv gino-agent e2e/gino-agent.bin
+
+      - name: Build + push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY}-test:${RELEASE_TAG}"
+          echo "${GH_TOKEN}" | docker login ghcr.io -u "${ACTOR}" --password-stdin
+          docker build -f e2e/Dockerfile.agent -t "${image}" e2e
+          docker push "${image}"

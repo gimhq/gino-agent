@@ -72,9 +72,12 @@ Response (success):
 ```
 
 `config.entries` is the GLOBAL-scope desired provisioning set and `config.version`
-the host-assigned monotonic global config version (agent-architecture §9b): the
-agent reconciles the global scope only when `version` advances past its applied
-version. The same two fields are delivered on `GET /agent/config/:agentId`
+the host-assigned monotonic config version (agent-architecture §9b): the agent
+reconciles the global scope only when a payload carries `entries` and its `version`
+advances past the applied provisioning version. `entries: []` removes every global
+entry; absent `entries` leaves the set alone. A host may send `version` on every
+overlay, with or without `entries`, and every `heartbeat` reports the last one applied
+as `configVersion`. The same two fields are delivered on `GET /agent/config/:agentId`
 (which returns the config object FLAT, not nested under `config`) and on
 `config_update`.
 `config.remoteOps` carries the host-set switches for engine-free operations (§5); every
@@ -187,7 +190,7 @@ agent-architecture); bytes never travel in frames.
 | `thread_result` | `taskId`, `threadId` | `{status, result?, error?, failure_reason?, engine_session_id?, duration_ms, final_seq, attachments?, encryption_error?}` | terminal outcome of one execution (mirror → `thread_runs`) |
 | `thread_message` | `taskId`, `threadId` | `{seq, kind, role?, content?, tool?, input?, output?, tool_use_id?, parent_tool_use_id?}` | one ordered transcript event (mirror → `messages`) |
 | `cron_state` | `taskId`, `cronId` | `{kind, schedule_type?, schedule_value?, continuity?, next_run?, status?, round_count, skipped_count, last_status?}` | local scheduling-ledger summary (mirror → `crons`) |
-| `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engine binaries the agent starts, `{name, version?, path}` each, probed in the background at startup (heartbeats before the probe finishes omit it) |
+| `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, configVersion?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engine binaries the agent starts, `{name, version?, path}` each, probed in the background at startup (heartbeats before the probe finishes omit it); `configVersion` is the last config `version` the agent applied (§3), omitted until one arrives |
 | `fs_response` | `reqId` | `{ok, entries? \| stat? \| sha256 + size, error?}` | answers the `fs_request` with the same `reqId`; live-only |
 | `e2ee_key_packages` | — | `{one_time?, last_resort?}` | publish KeyPackages to the host's key directory (§5.3) |
 | `e2ee_request` | `taskId`, `reqId` | `{op, …}` | one Delivery Service operation on the task's group (§5.3); live-only |
@@ -204,7 +207,7 @@ agent-architecture); bytes never travel in frames.
 | `message` | `taskId`, `threadId?` | `{text, attachments?}` | user/system input for a task (optionally a live thread) |
 | `interrupt` | `taskId?` | — | graceful cancel of the current turn (engine stays alive); with `taskId`, scoped: the agent interrupts only if that task owns the in-flight turn. Delivery is LIVE-ONLY (at-most-once): the host sends it to an online agent and never replays it on reconnect — a stale cancel must not fire against a future turn |
 | `close` | — | `{reason?}` (`stop\|restart\|remove`) | runner-level wind-down and exit (agent removal / launcher stop), **not** per-task close — per-task close = `task_upsert{status:"closed"}` + scoped `interrupt` |
-| `config_update` | — | `{entries, version, <config fields>}` | live config change (a merge patch over the §3 host config, `null` removes a key; `data` is required — `entries` + `version` drive the version-gated reconcile) |
+| `config_update` | — | `{entries, version, <config fields>}` | live config change (a merge patch over the §3 host config, `null` removes a key; `data` is required — `version` is reported by `heartbeat.configVersion`, and `entries` + `version` together drive the version-gated reconcile) |
 | `fs_request` | `reqId` | `{op, path, to?, recursive?, ref? + sha256? + size?, upload?}` | one engine-free file operation; live-only (never queued, never replayed) |
 | `e2ee_key_package_status` | (top-level `id?`) | `{one_time, last_resort, rejected?}` | the runner's KeyPackage pool at the host (§5.3); live-only |
 | `e2ee_log` | `taskId` | `{seq, kind, epoch, message, drop_public_key?}` | one handshake log entry of the task's group (§5.3) |
@@ -932,6 +935,11 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     ],
                     "additionalProperties": {}
                   }
+                },
+                "configVersion": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "e2ee": {
                   "type": "object",
@@ -2698,6 +2706,11 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     ],
                     "additionalProperties": {}
                   }
+                },
+                "configVersion": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "e2ee": {
                   "type": "object",

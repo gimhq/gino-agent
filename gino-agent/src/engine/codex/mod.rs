@@ -88,6 +88,9 @@ pub(crate) struct CodexSettings {
     pub(crate) extra_args: Vec<String>,
     /// Environment variables layered onto the child (engine credentials etc.).
     pub(crate) env: Vec<(String, String)>,
+    /// The API base URL, passed as a `-c` override: `codex exec` ignores the
+    /// `OPENAI_BASE_URL` env.
+    pub(crate) openai_base_url: Option<String>,
     /// The provisioned engine config dir. When set, the child is launched with
     /// both the generic `ENGINE_CONFIG_DIR` and codex's own `CODEX_HOME` pointed
     /// here, so it reads the instruction file + skills the runner materialized.
@@ -113,6 +116,7 @@ impl Default for CodexSettings {
             skip_git_repo_check: true,
             extra_args: Vec::new(),
             env: Vec::new(),
+            openai_base_url: None,
             config_dir: None,
             isolation: IsolationSpec::default(),
             isolation_floored: false,
@@ -127,17 +131,15 @@ impl CodexSettings {
     /// block. Every field is optional there and an ABSENT field leaves this
     /// struct's [`Default`] in place — notably `skip_git_repo_check`, where a
     /// missing value must keep the flag ON rather than silently meaning "off".
-    /// The credential env (`OPENAI_API_KEY` / `OPENAI_BASE_URL`) is materialised
-    /// here, at the secret boundary, exactly as the claude backend does.
+    /// The credential env is materialised here, at the secret boundary, exactly
+    /// as the claude backend does. `CODEX_API_KEY` is the key `codex exec` reads.
+    /// It ignores `OPENAI_API_KEY`.
     pub(crate) fn from_config(config: &Config) -> Self {
         let codex = &config.engine.codex;
         let defaults = Self::default();
         let mut env = Vec::new();
         if let Some(key) = &codex.openai_api_key {
-            env.push(("OPENAI_API_KEY".to_owned(), key.expose_secret().to_owned()));
-        }
-        if let Some(url) = &codex.openai_base_url {
-            env.push(("OPENAI_BASE_URL".to_owned(), url.clone()));
+            env.push(("CODEX_API_KEY".to_owned(), key.expose_secret().to_owned()));
         }
         Self {
             binary: super::admin::resolve_binary(
@@ -146,6 +148,7 @@ impl CodexSettings {
                 codex.binary.as_deref(),
             ),
             self_exe: std::env::current_exe().ok(),
+            openai_base_url: codex.openai_base_url.clone(),
             model: codex.model.clone(),
             approval_policy: codex.approval_policy.clone().or(defaults.approval_policy),
             sandbox_mode: codex.sandbox_mode.clone().or(defaults.sandbox_mode),
@@ -229,6 +232,13 @@ fn build_args(settings: &CodexSettings, resume: Option<&str>) -> Vec<String> {
     }
     if settings.skip_git_repo_check {
         argv.push("--skip-git-repo-check".to_owned());
+    }
+    if let Some(url) = &settings.openai_base_url {
+        argv.push("-c".to_owned());
+        argv.push(format!(
+            "openai_base_url={}",
+            serde_json::Value::from(url.as_str())
+        ));
     }
     argv.extend(settings.extra_args.iter().cloned());
     if let Some(thread_id) = resume {
@@ -955,14 +965,27 @@ mod tests {
         assert_eq!(settings.extra_args, ["--profile", "ci"]);
         assert_eq!(
             settings.env,
-            [
-                ("OPENAI_API_KEY".to_owned(), "sk-openai".to_owned()),
-                (
-                    "OPENAI_BASE_URL".to_owned(),
-                    "https://proxy.example.com/v1".to_owned()
-                ),
-            ]
+            [("CODEX_API_KEY".to_owned(), "sk-openai".to_owned())]
         );
+        assert_eq!(
+            settings.openai_base_url.as_deref(),
+            Some("https://proxy.example.com/v1")
+        );
+    }
+
+    #[test]
+    fn the_base_url_is_passed_as_a_config_override() {
+        let settings = CodexSettings {
+            openai_base_url: Some("https://proxy.example.com/v1".to_owned()),
+            ..CodexSettings::default()
+        };
+        let argv = build_args(&settings, None);
+        let flag = argv.iter().position(|arg| arg == "-c").expect("-c in argv");
+        assert_eq!(
+            argv[flag + 1],
+            r#"openai_base_url="https://proxy.example.com/v1""#
+        );
+        assert!(flag > argv.iter().position(|arg| arg == "exec").expect("exec"));
     }
 
     #[test]

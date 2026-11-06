@@ -59,6 +59,9 @@ use crate::engine::{EngineEvent, LogLevel, RunErrorKind, RunOutcome, RunStatus};
 
 /// The fallback error text for a failed turn whose payload carries nothing
 /// readable — an error [`RunOutcome`] must never surface an empty reason.
+/// How the codex client words a provider credential rejection.
+const AUTH_FAILURE_PREFIXES: [&str; 2] = ["unexpected status 401 ", "unexpected status 403 "];
+
 const UNKNOWN_FAILURE: &str = "codex reported a failed turn";
 
 /// The item kinds that stand for a tool call: these get an [`EngineEvent::ToolUse`]
@@ -207,18 +210,17 @@ impl EventMapper {
 
     /// The error [`RunOutcome`] for a failed turn.
     ///
-    /// DECISION: [`RunErrorKind::Execution`]. `failure::classify_outcome` maps it
-    /// to `agent.unknown` — non-retryable and resume-safe, the right posture for
-    /// an opaque engine failure whose cause the runner cannot inspect. No new
-    /// `RunErrorKind` variant is invented for codex; the enum stays
-    /// engine-agnostic.
+    /// [`RunErrorKind::Auth`] for a rejected credential, else
+    /// [`RunErrorKind::Execution`], which `failure::classify_outcome` maps to
+    /// `agent.unknown` — non-retryable and resume-safe.
     fn failure(&self, payload: Option<&Value>) -> EngineEvent {
+        let error = error_message(payload);
         EngineEvent::Result(RunOutcome {
             status: RunStatus::Error,
             result: None,
             session_id: self.thread_id.clone(),
-            error: Some(error_message(payload)),
-            error_kind: Some(RunErrorKind::Execution),
+            error_kind: Some(failure_kind(&error)),
+            error: Some(error),
         })
     }
 }
@@ -306,6 +308,19 @@ fn reasoning_text(item: &Value) -> Option<String> {
 /// Read a failure payload's human-readable reason, degrading step by step rather
 /// than failing: a nested `message` string, then the payload itself as a string,
 /// then its whole JSON serialization, then a fixed fallback.
+/// Classify a `turn.failed` message. Codex reports HTTP failures only as text,
+/// so this matches the client's own prefix, which model output cannot produce.
+fn failure_kind(message: &str) -> RunErrorKind {
+    if AUTH_FAILURE_PREFIXES
+        .iter()
+        .any(|prefix| message.starts_with(prefix))
+    {
+        RunErrorKind::Auth
+    } else {
+        RunErrorKind::Execution
+    }
+}
+
 fn error_message(payload: Option<&Value>) -> String {
     let Some(payload) = payload else {
         return UNKNOWN_FAILURE.to_owned();
@@ -321,6 +336,7 @@ fn error_message(payload: Option<&Value>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::failure_kind;
     use serde_json::json;
 
     use super::{EventMapper, TOOL_KINDS};
@@ -365,6 +381,30 @@ mod tests {
         assert_eq!(outcome.error_kind, Some(RunErrorKind::Execution));
         assert_eq!(outcome.session_id.as_deref(), Some("th-1"));
         assert!(outcome.result.is_none());
+    }
+
+    #[test]
+    fn turn_failed_with_a_rejected_credential_is_an_auth_failure() {
+        for status in ["401 Unauthorized", "403 Forbidden"] {
+            let message = format!("unexpected status {status}: bad key, url: http://x/responses");
+            let mut mapper = EventMapper::new();
+            let events =
+                mapper.map_line(&json!({"type": "turn.failed", "error": {"message": message}}));
+            let [EngineEvent::Result(outcome)] = events.as_slice() else {
+                panic!("expected exactly one Result event, got {events:?}");
+            };
+            assert_eq!(outcome.error_kind, Some(RunErrorKind::Auth));
+        }
+    }
+
+    #[test]
+    fn turn_failed_mentioning_a_status_elsewhere_stays_an_execution_failure() {
+        let message = "tool said: unexpected status 401 Unauthorized";
+        assert_eq!(failure_kind(message), RunErrorKind::Execution);
+        assert_eq!(
+            failure_kind("unexpected status 500 Internal"),
+            RunErrorKind::Execution
+        );
     }
 
     #[test]

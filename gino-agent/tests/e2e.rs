@@ -1811,6 +1811,117 @@ async fn restart_higher_global_version_reconciles() {
 }
 
 // ---------------------------------------------------------------------------
+// HIGHER version on restart WITHOUT `entries` → repair-only: an overlay version
+// alone says nothing about the provisioned set.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn restart_version_without_entries_keeps_installed_global() {
+    let claude_md = b"# Global CLAUDE.md kept\n";
+    let host = StubHost::start(
+        json!({ "entries": [provisioning_entry("clauderc", "CLAUDE.md", "file", claude_md)] }),
+    )
+    .await;
+    host.stage_blob("clauderc", claude_md).await;
+
+    let workspace = Workspace::new().await;
+    let ws = workspace.dir().to_path_buf();
+    let behavior = Behavior::echo_lines("sess-no-entries", 1);
+    let runner = RunnerProc::spawn_in(&host, &behavior, &workspace);
+    assert!(host.wait_connected(SETTLE).await, "runner never connected");
+
+    let claude_link = ws.join("engine-config/CLAUDE.md");
+    assert!(
+        wait_until(SETTLE, || claude_link.is_symlink()).await,
+        "entry never materialized"
+    );
+    assert!(
+        wait_until(SETTLE, || workspace.applied_global_version().is_some()).await,
+        "the first reconcile never recorded its version"
+    );
+
+    runner.shutdown().await;
+    host.set_served_config(json!({})).await;
+    assert_eq!(host.bump_config_version().await, 2);
+    let connects = host.ws_connects().await;
+
+    let restarted = RunnerProc::spawn_in(&host, &behavior, &workspace);
+    assert!(
+        host.wait_connects(connects + 1, SETTLE).await,
+        "runner never reconnected"
+    );
+
+    assert_eq!(std::fs::read(&claude_link).unwrap(), claude_md);
+    assert_eq!(
+        workspace.applied_global_version().as_deref(),
+        Some("1"),
+        "only a version and entries pair moves the applied provisioning version"
+    );
+
+    restarted.shutdown().await;
+}
+
+// ---------------------------------------------------------------------------
+// Heartbeats report the applied overlay version, with or without `entries`.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn heartbeat_reports_applied_overlay_version_without_entries() {
+    let host = StubHost::start(json!({ "heartbeatIntervalMs": 500 })).await;
+    let behavior = Behavior::echo_lines("sess-version", 1);
+    let runner = RunnerProc::spawn(&host, &behavior).await;
+    assert!(host.wait_connected(SETTLE).await, "runner never connected");
+
+    host.push_config_update(json!({ "version": 7, "engine": { "model": "m" } }))
+        .await;
+
+    assert!(
+        host.wait_heartbeat_config_version(7, SETTLE).await,
+        "heartbeats: {:?}",
+        host.heartbeats().await
+    );
+
+    runner.shutdown().await;
+}
+
+// ---------------------------------------------------------------------------
+// A failed reconcile must not report its version as applied.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn heartbeat_withholds_config_version_until_entries_reconcile() {
+    let host = StubHost::start(json!({ "heartbeatIntervalMs": 500 })).await;
+    let behavior = Behavior::echo_lines("sess-withheld", 1);
+    let runner = RunnerProc::spawn(&host, &behavior).await;
+    assert!(host.wait_connected(SETTLE).await, "runner never connected");
+
+    let bytes = b"# not staged yet\n";
+    let entry = provisioning_entry("clauderc", "CLAUDE.md", "file", bytes);
+    host.push_config_update(json!({ "version": 9, "entries": [entry.clone()] }))
+        .await;
+    let seen = host.heartbeats().await.len();
+    assert!(
+        host.wait_heartbeats(seen + 3, SETTLE).await,
+        "no heartbeats"
+    );
+    assert!(
+        !host.wait_heartbeat_config_version(9, Duration::ZERO).await,
+        "a failed reconcile was reported as applied"
+    );
+
+    host.stage_blob("clauderc", bytes).await;
+    host.push_config_update(json!({ "version": 10, "entries": [entry] }))
+        .await;
+    assert!(
+        host.wait_heartbeat_config_version(10, SETTLE).await,
+        "heartbeats: {:?}",
+        host.heartbeats().await
+    );
+
+    runner.shutdown().await;
+}
+
+// ---------------------------------------------------------------------------
 // OFFLINE startup fetch (non-200 GET /agent/config) → non-authoritative: the
 // installed global set is kept (repair-only), never wiped.
 // ---------------------------------------------------------------------------

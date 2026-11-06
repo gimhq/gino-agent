@@ -1,0 +1,26 @@
+# Agent test image: the released binary plus fake `claude` and `codex` engines.
+#
+# The build context is e2e/, with the agent staged as `gino-agent.bin`. Published
+# by release.yml as ghcr.io/gimhq/gino-agent-test:<tag> for host joint testing.
+FROM debian:bookworm-slim
+
+# bash + jq back the fake engines; ca-certificates lets reqwest verify TLS when
+# the host URL is https.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash jq ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY gino-agent.bin /app/gino-agent
+COPY fake-claude /usr/local/bin/claude
+# The runner registers the codex backend only when it finds a binary on PATH.
+COPY fake-codex /usr/local/bin/codex
+COPY agent-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/gino-agent /usr/local/bin/claude /usr/local/bin/codex /app/entrypoint.sh
+
+# GINO_HOST_URL, GINO_REGISTER_TOKEN and GINO_AGENT_NAME come from the caller.
+ENV GINO_WORKSPACE_DIR=/workspace \
+    GINO_DB_PATH=/workspace/agent.db \
+    PATH=/usr/local/bin:/usr/bin:/bin
+
+WORKDIR /workspace
+ENTRYPOINT ["/app/entrypoint.sh"]

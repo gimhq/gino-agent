@@ -770,6 +770,16 @@ impl StubHost {
         self.poll(timeout, |m| m.heartbeats.len() >= count).await
     }
 
+    /// Wait (≤`timeout`) until a heartbeat reports `version` as `configVersion`.
+    pub async fn wait_heartbeat_config_version(&self, version: i64, timeout: Duration) -> bool {
+        self.poll(timeout, |m| {
+            m.heartbeats
+                .iter()
+                .any(|heartbeat| heartbeat["configVersion"] == version)
+        })
+        .await
+    }
+
     /// Every `e2ee_key_packages` upload `data` received (replays included).
     #[allow(dead_code)] // used by the e2ee suite only
     pub async fn key_package_uploads(&self) -> Vec<Value> {

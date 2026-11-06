@@ -116,6 +116,8 @@ pub(crate) struct TransportConfig {
     pub(crate) engines: Arc<std::sync::OnceLock<Vec<crate::engine::admin::EngineInfo>>>,
     /// The e2ee capability every heartbeat carries (`data.e2ee`).
     pub(crate) e2ee: Option<E2eeCapability>,
+    /// The applied config version heartbeats report (`data.configVersion`).
+    pub(crate) config_version: Arc<std::sync::Mutex<Option<i64>>>,
     /// Receives the live-only e2ee frames (`e2ee_key_package_status`,
     /// `e2ee_response`), which bypass the inbox; without it they are dropped.
     pub(crate) e2ee_live: Option<mpsc::UnboundedSender<E2eeLiveFrame>>,
@@ -141,6 +143,7 @@ impl Default for TransportConfig {
             capabilities: Vec::new(),
             engines: Arc::default(),
             e2ee: None,
+            config_version: Arc::default(),
             e2ee_live: None,
             e2ee_ds: None,
             read_timeout: DEFAULT_READ_TIMEOUT,
@@ -208,6 +211,7 @@ impl Transport {
                 capabilities: config.capabilities,
                 engines: config.engines,
                 e2ee: config.e2ee,
+                config_version: config.config_version,
             },
             e2ee_live: config.e2ee_live,
             e2ee_ds: config.e2ee_ds,
@@ -540,6 +544,7 @@ mod tests {
             capabilities: Vec::new(),
             engines: Arc::default(),
             e2ee: None,
+            config_version: Arc::default(),
             e2ee_live: None,
             e2ee_ds: None,
             read_timeout: Duration::from_mins(2),

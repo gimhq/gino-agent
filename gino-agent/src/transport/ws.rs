@@ -39,7 +39,7 @@
 //!   ([`crate::db::Db::mark_inbox_processed`]); `close` is marked processed
 //!   *before* delivery to avoid a spurious re-shutdown on crash recovery.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
 use futures_util::stream::SplitSink;
@@ -744,6 +744,7 @@ pub(super) struct HeartbeatFrame {
     pub(super) capabilities: Vec<String>,
     pub(super) engines: Arc<OnceLock<Vec<EngineInfo>>>,
     pub(super) e2ee: Option<E2eeCapability>,
+    pub(super) config_version: Arc<Mutex<Option<i64>>>,
 }
 
 impl HeartbeatFrame {
@@ -752,17 +753,23 @@ impl HeartbeatFrame {
             self.capabilities.clone(),
             self.engines.get().cloned().unwrap_or_default(),
             self.e2ee.clone(),
+            *self
+                .config_version
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
         )
     }
 }
 
 /// Serialize the periodic liveness ping, carrying `capabilities`, the
-/// engines, the e2ee capability and no `activeThreads` summary; a producer
+/// engines, the e2ee capability, the applied config version and no
+/// `activeThreads` summary; a producer
 /// wanting `activeThreads` sends its own frame.
 pub(super) fn heartbeat_frame(
     capabilities: Vec<String>,
     engines: Vec<EngineInfo>,
     e2ee: Option<E2eeCapability>,
+    config_version: Option<i64>,
 ) -> String {
     serde_json::to_string(&OutboundFrame::Heartbeat {
         data: HeartbeatData {
@@ -770,6 +777,7 @@ pub(super) fn heartbeat_frame(
             capabilities,
             engines,
             e2ee,
+            config_version,
         },
         outbox_id: None,
     })
@@ -1139,17 +1147,18 @@ mod tests {
                     "sandbox:allowlist".to_owned(),
                 ],
                 Vec::new(),
-                None
+                None,
+                Some(7)
             ),
-            r#"{"type":"heartbeat","data":{"capabilities":["claude","sandbox","sandbox:allowlist"]}}"#
+            r#"{"type":"heartbeat","data":{"capabilities":["claude","sandbox","sandbox:allowlist"],"configVersion":7}}"#
         );
         assert_eq!(
-            heartbeat_frame(Vec::new(), Vec::new(), None),
+            heartbeat_frame(Vec::new(), Vec::new(), None, None),
             r#"{"type":"heartbeat","data":{}}"#
         );
         let e2ee = crate::protocol::frames::E2eeCapability::basic("cGs".to_owned());
         assert_eq!(
-            heartbeat_frame(vec!["claude".to_owned()], Vec::new(), Some(e2ee)),
+            heartbeat_frame(vec!["claude".to_owned()], Vec::new(), Some(e2ee), None),
             r#"{"type":"heartbeat","data":{"capabilities":["claude"],"e2ee":{"versions":[1],"mls_suites":[1],"credential":{"type":"basic","public_key":"cGs"}}}}"#
         );
         let claude = crate::engine::admin::EngineInfo {
@@ -1158,7 +1167,7 @@ mod tests {
             path: "/ws/engines/home/.local/bin/claude".to_owned(),
         };
         assert_eq!(
-            heartbeat_frame(vec!["claude".to_owned()], vec![claude], None),
+            heartbeat_frame(vec!["claude".to_owned()], vec![claude], None, None),
             r#"{"type":"heartbeat","data":{"capabilities":["claude"],"engines":[{"name":"claude","version":"2.1.310","path":"/ws/engines/home/.local/bin/claude"}]}}"#
         );
     }

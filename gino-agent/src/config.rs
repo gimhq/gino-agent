@@ -149,8 +149,9 @@ pub(crate) struct Config {
     /// Global-scope provisioning entries — the desired set of instruction files +
     /// skills materialized into `$ENGINE_CONFIG_DIR/`. The host
     /// re-pushes the full desired global set each refresh; an overlay carrying
-    /// `entries` **replaces** this vec. Default = empty.
-    pub(crate) entries: Vec<ProvisioningEntry>,
+    /// `entries` **replaces** this. `None` until a layer carries a set; `Some`
+    /// with an empty vec means the host wants none.
+    pub(crate) entries: Option<Vec<ProvisioningEntry>>,
     /// Host-assigned GLOBAL config version (version gate). Monotonic
     /// and server-owned; it scopes the agent's global config set (`entries`) and
     /// drives the startup/`config_update` reconcile decision: the runner reconciles
@@ -190,7 +191,7 @@ impl Default for Config {
             executor: ExecutorConfig::default(),
             attachments: AttachmentsConfig::default(),
             retention: RetentionConfig::default(),
-            entries: Vec::new(),
+            entries: None,
             config_version: None,
             heartbeat_interval_ms: DEFAULT_HEARTBEAT_INTERVAL_MS,
             remote_ops: RemoteOpsConfig::default(),
@@ -279,9 +280,9 @@ pub(crate) struct CodexConfig {
     pub(crate) skip_git_repo_check: Option<bool>,
     /// Extra arguments appended verbatim to the `codex` argv.
     pub(crate) extra_args: Vec<String>,
-    /// `OPENAI_API_KEY`.
+    /// Handed to the child as `CODEX_API_KEY`.
     pub(crate) openai_api_key: Option<SecretString>,
-    /// `OPENAI_BASE_URL` (e.g. a host credential proxy).
+    /// The child's `openai_base_url` config override (e.g. a host credential proxy).
     pub(crate) openai_base_url: Option<String>,
 }
 
@@ -505,9 +506,7 @@ impl Config {
         // Provisioning entries are a replace-when-Some list (cf. `allowed_tools` /
         // `content_type_allowlist`): the host re-pushes the full desired global set
         // each refresh, so `Some` replaces wholesale and `None` leaves it intact.
-        if let Some(list) = entries {
-            self.entries = list;
-        }
+        overlay_field(&mut self.entries, entries);
 
         // The GLOBAL config version is latest-Some-wins: a versioned
         // layer pins it, an unversioned layer leaves the prior version untouched.
@@ -1661,7 +1660,7 @@ mod tests {
         use crate::protocol::frames::EntryKind;
 
         let mut config = Config::default();
-        assert!(config.entries.is_empty());
+        assert!(config.entries.is_none());
         config.apply(
             ConfigOverlay::from_json(
                 r#"{
@@ -1683,13 +1682,16 @@ mod tests {
             )
             .unwrap(),
         );
-        assert_eq!(config.entries.len(), 2);
-        assert_eq!(config.entries[0].id, "clauderc");
-        assert_eq!(config.entries[0].target, "CLAUDE.md");
-        assert_eq!(config.entries[0].kind, EntryKind::File);
-        assert_eq!(config.entries[1].id, "demo");
-        assert_eq!(config.entries[1].target, ".claude/skills/demo");
-        assert_eq!(config.entries[1].kind, EntryKind::Dir);
+        assert_eq!(config.entries.as_ref().unwrap().len(), 2);
+        assert_eq!(config.entries.as_ref().unwrap()[0].id, "clauderc");
+        assert_eq!(config.entries.as_ref().unwrap()[0].target, "CLAUDE.md");
+        assert_eq!(config.entries.as_ref().unwrap()[0].kind, EntryKind::File);
+        assert_eq!(config.entries.as_ref().unwrap()[1].id, "demo");
+        assert_eq!(
+            config.entries.as_ref().unwrap()[1].target,
+            ".claude/skills/demo"
+        );
+        assert_eq!(config.entries.as_ref().unwrap()[1].kind, EntryKind::Dir);
     }
 
     #[test]
@@ -1705,16 +1707,16 @@ mod tests {
             )
             .unwrap(),
         );
-        assert_eq!(config.entries.len(), 1);
+        assert_eq!(config.entries.as_ref().unwrap().len(), 1);
 
         // An overlay WITHOUT `entries` leaves the prior set intact.
         config.apply(ConfigOverlay::from_json(r#"{ "logLevel": "debug" }"#).unwrap());
-        assert_eq!(config.entries.len(), 1);
-        assert_eq!(config.entries[0].id, "a");
+        assert_eq!(config.entries.as_ref().unwrap().len(), 1);
+        assert_eq!(config.entries.as_ref().unwrap()[0].id, "a");
 
         // The host re-pushes the full desired set: an explicit `[]` replaces to empty.
         config.apply(ConfigOverlay::from_json(r#"{ "entries": [] }"#).unwrap());
-        assert!(config.entries.is_empty());
+        assert!(config.entries.as_ref().unwrap().is_empty());
     }
 
     #[test]
