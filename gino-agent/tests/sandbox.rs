@@ -73,7 +73,11 @@ touch "$PWD/../engine-ran" 2>/dev/null
 fn claude_script(body: &str) -> String {
     let init = json!({ "type": "system", "subtype": "init", "session_id": SESSION, "model": "stub", "tools": [] });
     let result = json!({ "type": "result", "subtype": "success", "is_error": false, "result": "done", "session_id": SESSION });
-    format!("{PRELUDE}printf '%s\\n' '{init}'\n{body}\nprintf '%s\\n' '{result}'\n")
+    // The daemon's startup version probe runs outside the sandbox, so it must not
+    // reach the body.
+    format!(
+        "{PRELUDE}[ \"$1\" = --version ] && exit 0\nprintf '%s\\n' '{init}'\n{body}\nprintf '%s\\n' '{result}'\n"
+    )
 }
 
 /// A fresh directory for the engine fakes.

@@ -180,21 +180,19 @@ fn check(cfg: &ExitConfig) -> Result<(), ExitError> {
 }
 
 fn stack_config(cfg: &ExitConfig) -> NetStackConfig {
-    NetStackConfig {
-        tcp_rx_buffer: Some(TCP_BUFFER),
-        tcp_tx_buffer: Some(TCP_BUFFER),
-        max_udp_flows: MAX_UDP_FLOWS,
-        transparent: Some(TransparentConfig {
-            prefixes: Vec::new(),
-            admission: Admission::Decide {
-                timeout: cfg.admission_timeout,
-                max_pending: MAX_PENDING,
-            },
-            max_connections: Some(cfg.limits.max_tcp),
-            ..TransparentConfig::default()
-        }),
-        ..NetStackConfig::new(vec![(DNS_ADDR.ip(), STACK_PREFIX_LEN)], cfg.mtu)
-    }
+    let mut transparent = TransparentConfig::default();
+    transparent.max_connections = Some(cfg.limits.max_tcp);
+
+    let mut stack = NetStackConfig::new(vec![(DNS_ADDR.ip(), STACK_PREFIX_LEN)], cfg.mtu);
+    stack.tcp_rx_buffer = Some(TCP_BUFFER);
+    stack.tcp_tx_buffer = Some(TCP_BUFFER);
+    stack.max_udp_flows = MAX_UDP_FLOWS;
+    stack.transparent = Some(transparent);
+    stack.admission = Admission::Decide {
+        timeout: cfg.admission_timeout,
+        max_pending: MAX_PENDING,
+    };
+    stack
 }
 
 /// State shared by the exit's tasks.
@@ -370,6 +368,10 @@ async fn admit(shared: Arc<Shared>, pending: PendingFlow) {
     let proto = match pending.protocol() {
         PendingProtocol::Tcp => Proto::Tcp,
         PendingProtocol::Udp => Proto::Udp,
+        _ => {
+            pending.reject();
+            return;
+        }
     };
     let dst = pending.local_addr();
     let key = (pending.peer_addr(), dst);

@@ -1,6 +1,6 @@
 [package]
 name = "gino-agent"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.96.0"
 description = "Generic WebSocket-based, runtime-agnostic agent runner daemon for the gino orchestrator."
@@ -37,15 +37,15 @@ nix = { version = "0.31", default-features = false, features = ["dir", "fs", "mo
 openmls_rust_crypto = "=0.6.0"
 openmls_traits = "=0.6.0"
 # Packet source/sink traits and the pump between the guest TUN and the exit stack.
-nsplane = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+nsplane = { version = "0.22.1", git = "https://github.com/dotns/nsplane", tag = "v0.22.1" }
 # Guest DNS: wire codec, the `Resolver` trait and the fake-address pool.
-nsplane-dns = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3", features = ["netstack"] }
+nsplane-dns = { version = "0.22.1", git = "https://github.com/dotns/nsplane", tag = "v0.22.1", features = ["netstack"] }
 # Ethernet framing (ARP, gateway MAC) between a VM's virtio-net stream and the exit.
-nsplane-ether = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+nsplane-ether = { version = "0.22.1", git = "https://github.com/dotns/nsplane", tag = "v0.22.1" }
 # User-space TCP/IP stack terminating the guest's traffic in the per-run exit.
-nsplane-netstack = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+nsplane-netstack = { version = "0.22.1", git = "https://github.com/dotns/nsplane", tag = "v0.22.1" }
 # TUN device creation (TUNSETIFF) without unsafe code in this crate.
-nsplane-tun = { version = "0.19.3", git = "https://github.com/dotns/nsplane", tag = "v0.19.3" }
+nsplane-tun = { version = "0.22.1", git = "https://github.com/dotns/nsplane", tag = "v0.22.1" }
 # Async pseudo-terminal allocation and process spawning.
 pty-process = { version = "0.5.3", features = ["async"] }
 # HTTP client for register, config refresh and the output fallback. Default

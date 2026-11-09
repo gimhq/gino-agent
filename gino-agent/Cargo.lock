@@ -1076,7 +1076,7 @@ dependencies = [
 
 [[package]]
 name = "gino-agent"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2266,8 +2266,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "bytes",
  "nix 0.31.2",
@@ -2281,8 +2281,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-core"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "nsplane-noise",
  "nsplane-packet",
@@ -2292,8 +2292,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-dns"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "bytes",
  "nsplane-netstack",
@@ -2305,8 +2305,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-ether"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "libc",
  "nsplane",
@@ -2317,8 +2317,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-netstack"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "bytes",
  "futures-core",
@@ -2331,8 +2331,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-noise"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "aead",
  "aws-lc-rs",
@@ -2351,8 +2351,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-packet"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "bytes",
  "smallvec",
@@ -2361,8 +2361,8 @@ dependencies = [
 
 [[package]]
 name = "nsplane-tun"
-version = "0.19.3"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+version = "0.22.1"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "libc",
  "nsplane",
@@ -3413,7 +3413,7 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 [[package]]
 name = "simple-dns"
 version = "0.12.0"
-source = "git+https://github.com/dotns/nsplane?tag=v0.19.3#e6c67b5d4a5a1b816c088f740c2961dda1d5d417"
+source = "git+https://github.com/dotns/nsplane?tag=v0.22.1#94d179e1f502d2d1d82c03842a341e9daf4646f0"
 dependencies = [
  "bitflags 2.13.0",
 ]

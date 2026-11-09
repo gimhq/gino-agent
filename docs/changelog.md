@@ -113,3 +113,11 @@ Verification: fmt, clippy, unit tests (917 passed), e2e (29 passed); real codex-
 External hosts get `docs/host-quickstart.md`, walked through with `gino-mini-host` and the test
 image (fake claude and codex). Section 8 of the protocol is regenerated with `configVersion`, and
 `gino-agent/tests/protocol_schema.rs` now checks it against the runner's frames in this repo.
+
+## 2026-11-09 12:30 [progress]
+
+nsplane 0.22.1 replaces 0.19.3: admission moves to `NetStackConfig`, and the exit rejects a flow
+of a protocol it does not know. The sandbox suite's fake engine now ignores `--version`, because the
+daemon's startup probe ran its write probe outside the sandbox. Agent version 0.2.0.
+Verification: fmt, clippy, deny, unit tests (917 passed), e2e (29 passed), `sandbox-it.sh` (17
+passed), `vm-it.sh` (all scenarios passed).
