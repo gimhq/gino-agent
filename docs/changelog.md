@@ -134,3 +134,11 @@ Dependency refresh before 0.2.0: semver-compatible lockfile updates in all four 
 6.12.116, rootfs claude 2.1.319, CI on Bun 1.4.4, osv-scanner-action 2.7.0 and trufflehog 3.99.8.
 Verification: clippy, tests, deny and shear per crate; `sandbox-it.sh` and `vm-it.sh` on the new
 kernel and rootfs.
+
+## 2026-11-09 19:45 [progress]
+
+Major upgrades for 0.2.0: Rust 1.99.1, croner 4 with the five-field grammar pinned, rtnetlink 0.24,
+openmls 0.9.2, current GitHub Actions majors and @antfu/eslint-config 10. Held back: ed25519-dalek
+and aes-gcm (openmls_rust_crypto 0.6 needs the current majors), bzip2 (libkrun needs 0.5) and
+TypeScript 7 (typescript-eslint does not support it).
+Verification: clippy, tests, deny per crate; `sandbox-it.sh` (17 passed); `vm-it.sh`; wasm drift check.
