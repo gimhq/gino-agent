@@ -1,5 +1,5 @@
 # Build image for the gino-e2ee wasm package (scripts/build-wasm.sh).
-FROM rust:1.96-bookworm
+FROM rust:1.99-bookworm
 
 # The crate's pinned toolchain (rust-toolchain.toml) with the wasm32 target.
 RUN rustup toolchain install 1.96.0 --profile minimal \
