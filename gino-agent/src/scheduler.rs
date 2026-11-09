@@ -60,6 +60,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
 use croner::Cron;
+use croner::parser::{CronParser, Seconds, Year};
 use thiserror::Error;
 use tokio::sync::Notify;
 use tracing::{debug, info, warn};
@@ -228,12 +229,16 @@ fn next_run_after_fire(
     }
 }
 
-/// Parse a 5-field cron expression with [`croner`]. The default (no
-/// `with_seconds_*`) is exactly 5 fields, mapping the host's `0 <expr>` cronbake
-/// form (seconds pinned to `0`) to the same instants.
+/// Parse a 5-field cron expression with [`croner`]. Seconds and years are
+/// refused, mapping the host's `0 <expr>` cronbake form (seconds pinned to `0`)
+/// to the same instants; `0/10`-style steps stay accepted.
 fn parse_cron(expr: &str) -> Result<Cron, SchedulerError> {
-    Cron::new(expr.trim())
-        .parse()
+    CronParser::builder()
+        .seconds(Seconds::Disallowed)
+        .year(Year::Disallowed)
+        .sloppy_ranges(true)
+        .build()
+        .parse(expr.trim())
         .map_err(|source| SchedulerError::Cron {
             expr: expr.to_owned(),
             source,
@@ -1199,6 +1204,54 @@ mod tests {
             continuity: continuity.to_owned(),
             next_run: None,
             status: None,
+        }
+    }
+
+    fn utc(text: &str) -> DateTime<Utc> {
+        text.parse().unwrap()
+    }
+
+    #[test]
+    fn cron_expressions_keep_exactly_five_fields() {
+        use super::parse_cron;
+
+        assert!(parse_cron("*/10 * * * * *").is_err());
+        assert!(parse_cron("0 0 * * * * 2030").is_err());
+        assert!(parse_cron("* * * *").is_err());
+    }
+
+    #[test]
+    fn cron_expressions_keep_their_next_occurrences() {
+        use super::next_cron_after;
+
+        for (expr, now, next) in [
+            (
+                "*/5 * * * *",
+                "2026-01-01T00:03:00Z",
+                "2026-01-01T00:05:00Z",
+            ),
+            (
+                "0/10 * * * *",
+                "2026-01-01T00:03:00Z",
+                "2026-01-01T00:10:00Z",
+            ),
+            // Day of month and day of week are alternatives.
+            ("0 9 2 * 1", "2026-01-02T10:00:00Z", "2026-01-05T09:00:00Z"),
+            ("0 0 * * 7", "2026-01-01T00:00:00Z", "2026-01-04T00:00:00Z"),
+            ("0 0 * * 0", "2026-01-01T00:00:00Z", "2026-01-04T00:00:00Z"),
+            (
+                "0 12 * * MON-FRI",
+                "2026-01-03T00:00:00Z",
+                "2026-01-05T12:00:00Z",
+            ),
+            // Strictly after `now`.
+            ("0 12 * * *", "2026-01-01T12:00:00Z", "2026-01-02T12:00:00Z"),
+        ] {
+            assert_eq!(
+                next_cron_after(expr, utc(now)).unwrap(),
+                utc(next),
+                "{expr}"
+            );
         }
     }
 

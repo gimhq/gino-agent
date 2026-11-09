@@ -25,7 +25,7 @@ clap = { version = "4", features = ["derive", "env"] }
 gino-e2ee = { path = "../gino-e2ee" }
 # 5-field cron next-run computation. PINNED: 3.x pulls a proc-macro tree the
 # scheduler does not need.
-croner = "2"
+croner = "4"
 # Stream/Sink combinators for the split WebSocket connection.
 futures-util = { version = "0.3", default-features = false, features = ["std", "sink"] }
 # SIGINT to the `codex exec` child, which has no in-band cancel channel, the
@@ -54,7 +54,7 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls", "j
 # `bundled` compiles the vendored SQLite, so no system libsqlite3 is needed.
 rusqlite = { version = "0.41", features = ["bundled", "fallible_uint"] }
 # Address, link and route configuration of the TUN device over rtnetlink.
-rtnetlink = "0.23"
+rtnetlink = "0.24"
 # Safe sendmsg/recvmsg with SCM_RIGHTS for passing the TUN fd between processes,
 # and capability clearing in `sandbox-init` (nix has no capset wrapper).
 rustix = { version = "1.1.5", features = ["net", "thread"] }
