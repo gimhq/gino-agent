@@ -2,7 +2,7 @@
 name = "gino-e2ee"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.96.0"
+rust-version = "1.99.1"
 description = "End-to-end encryption core for gino: MLS groups, exporter-derived content keys and HPKE drops."
 license = "Apache-2.0"
 repository = "https://github.com/gimhq/gino"
@@ -71,6 +71,8 @@ elided_lifetimes_in_paths = "warn"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+# Its suggestion is noisier than `assert!(x.is_empty())` for test assertions.
+assert_is_empty = "allow"
 # No panics in runtime paths (relaxed in tests via clippy.toml).
 unwrap_used = "deny"
 expect_used = "deny"

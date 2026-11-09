@@ -34,7 +34,7 @@ jobs:
       - name: System deps
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake clang libclang-dev
 
-      # rust-toolchain.toml pins the channel (1.96.0) + rustfmt/clippy components.
+      # rust-toolchain.toml pins the channel (1.99.1) + rustfmt/clippy components.
       - name: Rust toolchain
         run: rustup show
 
@@ -133,7 +133,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # rust-toolchain.toml pins the channel (1.96.0), rustfmt/clippy and the musl target.
+      # rust-toolchain.toml pins the channel (1.99.1), rustfmt/clippy and the musl target.
       # libkrun is compiled in from its pinned git commit; it needs a C compiler (and
       # musl-gcc for the static build) but no KVM.
       - name: Rust toolchain
@@ -192,7 +192,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # rust-toolchain.toml pins the channel (1.96.0), rustfmt/clippy and the wasm32 target.
+      # rust-toolchain.toml pins the channel (1.99.1), rustfmt/clippy and the wasm32 target.
       - name: Rust toolchain
         run: rustup show
 
@@ -239,7 +239,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # rust-toolchain.toml pins the channel (1.96.0) + rustfmt/clippy components.
+      # rust-toolchain.toml pins the channel (1.99.1) + rustfmt/clippy components.
       - name: Rust toolchain
         run: rustup show
 
@@ -283,7 +283,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # rust-toolchain.toml pins the channel (1.96.0), clippy and the wasm32 target.
+      # rust-toolchain.toml pins the channel (1.99.1), clippy and the wasm32 target.
       - name: Rust toolchain
         working-directory: gino-e2ee
         run: rustup show

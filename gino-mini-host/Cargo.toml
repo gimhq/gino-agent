@@ -2,7 +2,7 @@
 name = "gino-mini-host"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.96.0"
+rust-version = "1.99.1"
 description = "Minimal reference host for gino-agent: enrollment, dispatch and transcripts over the host-agent protocol."
 license = "Apache-2.0"
 repository = "https://github.com/gimhq/gino-agent"

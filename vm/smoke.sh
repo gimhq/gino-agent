@@ -14,7 +14,7 @@
 #   ROOTFS_DIR      guest root image dir (default: <worktree>/.tmp/vm/rootfs)
 #   TARGET_DIR      gino-vmm cargo target dir (default: <worktree>/.tmp/vm/target)
 #   IMAGE           gino-vmm build image, built from vm/vmm/Dockerfile
-#                   (default: ai-agent/gino-vmm-build:1.96)
+#                   (default: ai-agent/gino-vmm-build:1.99)
 #   RUN_IMAGE       image running gino-vmm (default: debian:bookworm-slim)
 #   VCPUS           guest vCPUs (default: 1)
 #   MEMORY_MIB      guest memory (default: 512)
@@ -36,7 +36,7 @@ OUT="${OUT:-$WT/.tmp/vm/bin}"
 KERNEL_DIR="${KERNEL_DIR:-$WT/.tmp/vm/kernel}"
 ROOTFS_DIR="${ROOTFS_DIR:-$WT/.tmp/vm/rootfs}"
 TARGET_DIR="${TARGET_DIR:-$WT/.tmp/vm/target}"
-IMAGE="${IMAGE:-ai-agent/gino-vmm-build:1.96}"
+IMAGE="${IMAGE:-ai-agent/gino-vmm-build:1.99}"
 RUN_IMAGE="${RUN_IMAGE:-debian:bookworm-slim}"
 VCPUS="${VCPUS:-1}"
 MEMORY_MIB="${MEMORY_MIB:-512}"

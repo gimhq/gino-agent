@@ -143,7 +143,7 @@ impl KeyHistory {
             return Err(Error::Malformed);
         }
         let mut entries = Vec::with_capacity(count);
-        for chunk in rest.chunks_exact(ENTRY_LEN) {
+        for chunk in rest.as_chunks::<ENTRY_LEN>().0 {
             let (entry_epoch, secrets) = chunk.split_first_chunk::<8>().ok_or(Error::Malformed)?;
             entries.push(KeyHistoryEntry {
                 epoch: u64::from_be_bytes(*entry_epoch),

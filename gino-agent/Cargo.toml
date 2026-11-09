@@ -2,7 +2,7 @@
 name = "gino-agent"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.96.0"
+rust-version = "1.99.1"
 description = "Generic WebSocket-based, runtime-agnostic agent runner daemon for the gino orchestrator."
 license = "Apache-2.0"
 repository = "https://github.com/gimhq/gino"
@@ -127,6 +127,8 @@ elided_lifetimes_in_paths = "warn"
 # pair conflict inside a binary crate) and `cargo` only checks crates.io publishing
 # metadata, which is irrelevant for this unpublished binary.
 pedantic = { level = "warn", priority = -1 }
+# Its suggestion is noisier than `assert!(x.is_empty())` for test assertions.
+assert_is_empty = "allow"
 # No panics in runtime paths (relaxed in tests via clippy.toml).
 unwrap_used = "deny"
 expect_used = "deny"

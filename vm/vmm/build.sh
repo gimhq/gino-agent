@@ -7,7 +7,7 @@
 #   OUT             output dir (default: <worktree>/.tmp/vm/bin)
 #   TARGET_DIR      cargo target dir (default: <worktree>/.tmp/vm/target)
 #   IMAGE           build image, built from vm/vmm/Dockerfile
-#                   (default: ai-agent/gino-vmm-build:1.96)
+#                   (default: ai-agent/gino-vmm-build:1.99)
 #   CARGO_REGISTRY  host dir mounted as the container's cargo registry cache
 #                   (default: /srv/station/root/.cargo/registry; empty = no mount)
 #   CARGO_GIT       host dir mounted as the container's cargo git checkout cache
@@ -24,7 +24,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WT="$(git -C "$HERE" rev-parse --show-toplevel)"
 OUT="${OUT:-$WT/.tmp/vm/bin}"
 TARGET_DIR="${TARGET_DIR:-$WT/.tmp/vm/target}"
-IMAGE="${IMAGE:-ai-agent/gino-vmm-build:1.96}"
+IMAGE="${IMAGE:-ai-agent/gino-vmm-build:1.99}"
 CARGO_REGISTRY="${CARGO_REGISTRY-/srv/station/root/.cargo/registry}"
 CARGO_GIT="${CARGO_GIT-/srv/station/root/.cargo/git}"
 
