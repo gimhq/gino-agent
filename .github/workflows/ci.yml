@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: gino-agent
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # C toolchain for the two crates that compile C — aws-lc-sys (rustls crypto)
       # and libsqlite3-sys (bundled SQLite).
@@ -39,7 +39,7 @@ jobs:
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -87,7 +87,7 @@ jobs:
       run:
         working-directory: gino-agent
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: System deps (musl cross + C toolchain)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools musl-dev cmake clang libclang-dev
@@ -98,7 +98,7 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -131,7 +131,7 @@ jobs:
       run:
         working-directory: gino-vmm
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # rust-toolchain.toml pins the channel (1.99.1), rustfmt/clippy and the musl target.
       # libkrun is compiled in from its pinned git commit; it needs a C compiler (and
@@ -143,7 +143,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -190,14 +190,14 @@ jobs:
       run:
         working-directory: gino-e2ee
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # rust-toolchain.toml pins the channel (1.99.1), rustfmt/clippy and the wasm32 target.
       - name: Rust toolchain
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -237,14 +237,14 @@ jobs:
       run:
         working-directory: gino-mini-host
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # rust-toolchain.toml pins the channel (1.99.1) + rustfmt/clippy components.
       - name: Rust toolchain
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -281,7 +281,7 @@ jobs:
       run:
         working-directory: sdks/e2ee
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # rust-toolchain.toml pins the channel (1.99.1), clippy and the wasm32 target.
       - name: Rust toolchain
@@ -289,7 +289,7 @@ jobs:
         run: rustup show
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -335,7 +335,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # trufflehog walks history
 
@@ -362,7 +362,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
