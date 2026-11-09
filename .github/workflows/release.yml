@@ -174,8 +174,8 @@ jobs:
         run: |
           set -euo pipefail
           gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" -p "${AGENT_ASSET}"
-          tar -xzf "${AGENT_ASSET}" gino-agent
-          mv gino-agent e2e/gino-agent.bin
+          tar -xzOf "${AGENT_ASSET}" gino-agent > e2e/gino-agent.bin
+          chmod 0755 e2e/gino-agent.bin
 
       - name: Build + push
         env:
