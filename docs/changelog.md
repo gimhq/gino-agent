@@ -121,3 +121,9 @@ of a protocol it does not know. The sandbox suite's fake engine now ignores `--v
 daemon's startup probe ran its write probe outside the sandbox. Agent version 0.2.0.
 Verification: fmt, clippy, deny, unit tests (917 passed), e2e (29 passed), `sandbox-it.sh` (17
 passed), `vm-it.sh` (all scenarios passed).
+
+## 2026-11-09 13:40 [progress]
+
+rusqlite 0.41 brings bundled SQLite past RUSTSEC-2026-0459. `agent_api` tests that start a server
+now run one at a time, because they share the process-wide `RUNNING` handle.
+Verification: fmt, clippy, deny, shear, all test targets, 12 repeated runs of `agent_api::tests`.

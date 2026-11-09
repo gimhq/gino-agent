@@ -257,11 +257,7 @@ fn db_cells(db: &Path) -> Vec<(String, Vec<u8>)> {
     let mut cells = Vec::new();
     for table in tables {
         let mut statement = conn.prepare(&format!("SELECT * FROM \"{table}\"")).unwrap();
-        let columns: Vec<String> = statement
-            .column_names()
-            .into_iter()
-            .map(str::to_owned)
-            .collect();
+        let columns: Vec<String> = statement.column_names().map(str::to_owned).collect();
         let mut rows = statement.query([]).unwrap();
         while let Some(row) = rows.next().unwrap() {
             for (index, column) in columns.iter().enumerate() {

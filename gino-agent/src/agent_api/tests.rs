@@ -18,6 +18,9 @@ use super::server::{Shared, serve_connection, serve_run_peers, serve_run_peers_w
 use super::{AgentApiServer, ApiContext, RunScope, TokenRegistry, socket_path};
 use crate::db::{CronRow, Db, TaskRow, ThreadRow};
 
+/// Held by each test that starts a server: they share the process-wide `RUNNING`.
+static RUNNING_SERVER: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 const TS: &str = "2026-10-24T00:00:00Z";
 
 fn seed_task(db: &Db, id: &str) {
@@ -422,6 +425,7 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> 
 
 #[tokio::test(flavor = "multi_thread")]
 async fn server_lifecycle_permissions_and_operator_client() {
+    let _running = RUNNING_SERVER.lock().await;
     let (_dir, ctx) = context();
     let workspace = ctx.workspace_dir.clone();
     let db_path = ctx.db_path.clone();
@@ -835,6 +839,7 @@ async fn cron_mutations_update_status_and_enqueue_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_created_cron_is_visible_to_the_scheduler() {
+    let _running = RUNNING_SERVER.lock().await;
     let (_dir, ctx) = context();
     let workspace = ctx.workspace_dir.clone();
     let nudge = Arc::clone(&ctx.nudge);
@@ -1088,6 +1093,7 @@ async fn a_run_peer_socket_never_grants_operator_and_takes_only_its_token() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn run_peers_need_the_running_server() {
+    let _running = RUNNING_SERVER.lock().await;
     let dir = tempfile::tempdir().unwrap();
     let listener = tokio::net::UnixListener::bind(dir.path().join("a.sock")).unwrap();
     let err = serve_run_peers(listener, "tok").unwrap_err();

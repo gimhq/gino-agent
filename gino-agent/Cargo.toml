@@ -52,7 +52,7 @@ pty-process = { version = "0.5.3", features = ["async"] }
 # features are off because they enable native-tls.
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
 # `bundled` compiles the vendored SQLite, so no system libsqlite3 is needed.
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled", "fallible_uint"] }
 # Address, link and route configuration of the TUN device over rtnetlink.
 rtnetlink = "0.23"
 # Safe sendmsg/recvmsg with SCM_RIGHTS for passing the TUN fd between processes,
