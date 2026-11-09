@@ -7,8 +7,8 @@
 FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
 
 # Native claude CLI release; checksum from downloads.claude.ai/claude-code-releases/<version>/manifest.json.
-ARG CLAUDE_VERSION=2.1.308
-ARG CLAUDE_SHA256=356733f185fa988e6bf3aa9a555269fdd167982a2e2a80d3c8a78037bb92ad58
+ARG CLAUDE_VERSION=2.1.319
+ARG CLAUDE_SHA256=dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed
 
 # Docker Engine from download.docker.com; the key's sha256 pins the repository signer.
 ARG DOCKER_GPG_SHA256=1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570

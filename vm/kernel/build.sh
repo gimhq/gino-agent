@@ -13,8 +13,8 @@
 #          (default: ai-agent/gino-vm-kernel-build:bookworm)
 set -euo pipefail
 
-KERNEL_VERSION=6.12.114
-KERNEL_SHA256=7a8589912bd7a8adb07fed074283652cf482a35facef8954554654f0154b4af3
+KERNEL_VERSION=6.12.116
+KERNEL_SHA256=cb3ed3dfdd47e6ade49dc933db334fd86e24cadee920da612c262b0e9b6a511b
 KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz"
 
 for tool in docker git curl sha256sum; do

@@ -127,3 +127,10 @@ passed), `vm-it.sh` (all scenarios passed).
 rusqlite 0.41 brings bundled SQLite past RUSTSEC-2026-0459. `agent_api` tests that start a server
 now run one at a time, because they share the process-wide `RUNNING` handle.
 Verification: fmt, clippy, deny, shear, all test targets, 12 repeated runs of `agent_api::tests`.
+
+## 2026-11-09 15:00 [progress]
+
+Dependency refresh before 0.2.0: semver-compatible lockfile updates in all four crates, kernel
+6.12.116, rootfs claude 2.1.319, CI on Bun 1.4.4, osv-scanner-action 2.7.0 and trufflehog 3.99.8.
+Verification: clippy, tests, deny and shear per crate; `sandbox-it.sh` and `vm-it.sh` on the new
+kernel and rootfs.
