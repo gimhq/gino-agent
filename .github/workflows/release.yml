@@ -185,5 +185,7 @@ jobs:
           set -euo pipefail
           image="ghcr.io/${GITHUB_REPOSITORY}-test:${RELEASE_TAG}"
           echo "${GH_TOKEN}" | docker login ghcr.io -u "${ACTOR}" --password-stdin
-          docker build -f e2e/Dockerfile.agent -t "${image}" e2e
+          docker build -f e2e/Dockerfile.agent \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            -t "${image}" e2e
           docker push "${image}"
