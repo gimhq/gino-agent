@@ -28,7 +28,10 @@ export type SealedValue = z.infer<typeof SealedValue>;
 export const E2eeCapability = z.looseObject({
   versions: z.array(z.number().int()),
   mls_suites: z.array(z.number().int()),
-  credential: z.looseObject({ type: z.string(), public_key: Base64Url }),
+  credential: z.looseObject({
+    type: z.string(),
+    public_key: Base64Url,
+  }),
 });
 export type E2eeCapability = z.infer<typeof E2eeCapability>;
 
@@ -42,7 +45,12 @@ export type TaskE2ee = z.infer<typeof TaskE2ee>;
 /** One handshake log entry of a task's group (e2ee spec §3.1). */
 export const E2eeLogEntry = z.looseObject({
   seq: Uint.min(1),
-  kind: z.enum(["commit", "proposal", "key_history", "key_history_sealed"]),
+  kind: z.enum([
+    "commit",
+    "proposal",
+    "key_history",
+    "key_history_sealed",
+  ]),
   epoch: Uint,
   message: Base64Url,
   /** `commit` entries: the drop public key of epoch `epoch + 1`. */
@@ -65,7 +73,10 @@ export type E2eeKeyPackagesData = z.infer<typeof E2eeKeyPackagesData>;
 export const E2eeKeyPackageStatusData = z.looseObject({
   one_time: Uint,
   last_resort: z.boolean(),
-  rejected: z.array(z.looseObject({ code: z.string(), index: Uint.optional() })).optional(),
+  rejected: z.array(z.looseObject({
+    code: z.string(),
+    index: Uint.optional(),
+  })).optional(),
 });
 export type E2eeKeyPackageStatusData = z.infer<typeof E2eeKeyPackageStatusData>;
 
@@ -80,10 +91,23 @@ const E2eeKeyHistory = z.looseObject({
  * (e2ee spec §3.2, §3.4, §3.7), discriminated on `op`.
  */
 export const E2eeRequestData = z.discriminatedUnion("op", [
-  z.looseObject({ op: z.literal("log"), after_seq: Uint }),
-  z.looseObject({ op: z.literal("log_from_epoch"), epoch: Uint }),
-  z.looseObject({ op: z.literal("link"), epoch: Uint.min(1) }),
-  z.looseObject({ op: z.literal("put_link"), epoch: Uint.min(1), link: Base64Url }),
+  z.looseObject({
+    op: z.literal("log"),
+    after_seq: Uint,
+  }),
+  z.looseObject({
+    op: z.literal("log_from_epoch"),
+    epoch: Uint,
+  }),
+  z.looseObject({
+    op: z.literal("link"),
+    epoch: Uint.min(1),
+  }),
+  z.looseObject({
+    op: z.literal("put_link"),
+    epoch: Uint.min(1),
+    link: Base64Url,
+  }),
   z.looseObject({
     op: z.literal("commit"),
     commit: Base64Url,
@@ -102,7 +126,10 @@ export type E2eeRequestData = z.infer<typeof E2eeRequestData>;
  */
 export const E2eeResponseData = z.looseObject({
   ok: z.boolean(),
-  error: z.looseObject({ code: z.string(), message: z.string().optional() }).optional(),
+  error: z.looseObject({
+    code: z.string(),
+    message: z.string().optional(),
+  }).optional(),
   entries: z.array(E2eeLogEntry).optional(),
   more: z.boolean().optional(),
   epoch: Uint.optional(),

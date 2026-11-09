@@ -35,7 +35,11 @@ export function logEntryData(row: E2eeLogEntryRow): E2eeLogEntry {
     kind: row.kind,
     epoch: row.epoch,
     message: encodeB64url(row.bytes),
-    ...(row.dropPublicKey ? { drop_public_key: encodeB64url(row.dropPublicKey) } : {}),
+    ...(row.dropPublicKey
+      ? {
+          drop_public_key: encodeB64url(row.dropPublicKey),
+        }
+      : {}),
   };
 }
 
@@ -44,7 +48,14 @@ export function logEntryData(row: E2eeLogEntryRow): E2eeLogEntry {
  * start its cursor there, so the entries after the commit follow the Welcome.
  */
 export function deliverWelcome(deps: DeliveryDeps, taskId: string, agentId: string, seq: number, welcome: Uint8Array): void {
-  deps.agents.enqueue(agentId, { type: "e2ee_welcome", taskId, data: { welcome: encodeB64url(welcome), seq } });
+  deps.agents.enqueue(agentId, {
+    type: "e2ee_welcome",
+    taskId,
+    data: {
+      welcome: encodeB64url(welcome),
+      seq,
+    },
+  });
   deps.repo.advanceDeliveryCursor(taskId, agentId, seq, deps.clock());
 }
 
@@ -58,7 +69,11 @@ export function deliverLog(deps: DeliveryDeps, taskId: string, agentId: string, 
       if (row.seq > untilSeq) {
         return;
       }
-      deps.agents.enqueue(agentId, { type: "e2ee_log", taskId, data: logEntryData(row) });
+      deps.agents.enqueue(agentId, {
+        type: "e2ee_log",
+        taskId,
+        data: logEntryData(row),
+      });
       repo.advanceDeliveryCursor(taskId, agentId, row.seq, deps.clock());
       cursor = row.seq;
     }

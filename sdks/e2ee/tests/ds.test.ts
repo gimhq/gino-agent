@@ -29,7 +29,11 @@ function errorOf(run: () => unknown): E2eeError {
 function party() {
   const identity = Identity.generate();
   const keyPackages = new KeyPackageStore();
-  return { identity, keyPackages, keyPackage: (lastResort = false) => keyPackages.generate(identity, lastResort) };
+  return {
+    identity,
+    keyPackages,
+    keyPackage: (lastResort = false) => keyPackages.generate(identity, lastResort),
+  };
 }
 
 function now(): number {

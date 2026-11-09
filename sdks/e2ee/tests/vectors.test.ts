@@ -49,7 +49,10 @@ function hex(bytes: Uint8Array): string {
 }
 
 function secretsOf(value: Json): EpochSecrets {
-  return { k: unhex(value.k), d: unhex(value.d) };
+  return {
+    k: unhex(value.k),
+    d: unhex(value.d),
+  };
 }
 
 /** The `{code, epoch?}` of a failure, or `null` if `run` succeeds. */
@@ -109,7 +112,11 @@ describe("test vectors", () => {
 
   test("content", () => {
     for (const v of vectors.content) {
-      const [k, salt, plaintext] = [unhex(v.k_e), unhex(v.salt), unhex(v.plaintext)];
+      const [k, salt, plaintext] = [
+        unhex(v.k_e),
+        unhex(v.salt),
+        unhex(v.plaintext),
+      ];
       expect(hex(messageKey(k, salt))).toBe(v.k_msg);
       const envelope = sealContentWith(salt, k, v.epoch, v.location, plaintext);
       expect(hex(envelope)).toBe(v.envelope);
@@ -147,7 +154,10 @@ describe("test vectors", () => {
 
   test("epoch_link", () => {
     for (const v of vectors.epoch_link) {
-      const secrets = { k: unhex(v.k_e), d: unhex(v.d_e) };
+      const secrets = {
+        k: unhex(v.k_e),
+        d: unhex(v.d_e),
+      };
       const kNext = unhex(v.k_next);
       expect(hex(sealEpochLinkWith(unhex(v.salt), v.scope, v.epoch, secrets, kNext))).toBe(v.envelope);
       expect(openEpochLink(v.scope, v.epoch, kNext, unhex(v.envelope))).toEqual(secrets);
@@ -158,7 +168,10 @@ describe("test vectors", () => {
     for (const v of vectors.key_history) {
       const history = {
         epoch: v.epoch,
-        entries: v.entries.map((e: Json) => ({ epoch: e.epoch, ...secretsOf(e) })),
+        entries: v.entries.map((e: Json) => ({
+          epoch: e.epoch,
+          ...secretsOf(e),
+        })),
       };
       expect(hex(encodeKeyHistory(history))).toBe(v.payload);
       expect(decodeKeyHistory(unhex(v.payload))).toEqual(history);
@@ -191,10 +204,14 @@ describe("test vectors", () => {
   test("field_map", () => {
     for (const v of vectors.field_map) {
       const map: FieldMap | Json = v.map ?? taskContentFieldMap;
-      const engine = v.map ? fieldMapFromJson(v.map) : FieldMapEngine.forProfile(v.profile);
+      const engine = v.map
+        ? fieldMapFromJson(v.map)
+        : FieldMapEngine.forProfile(v.profile);
       const frameType: string = v.frame.type;
       const scopePath: string | undefined = map.frames[frameType]?.scope;
-      const scope: string = scopePath === undefined ? "t-1" : v.frame[scopePath];
+      const scope: string = scopePath === undefined
+        ? "t-1"
+        : v.frame[scopePath];
       const epochs = Object.keys(v.secrets).map(Number).sort((a, b) => a - b);
       const current = epochs.at(-1)!;
       const history = new History(scope, current, secretsOf(v.secrets[current]));
@@ -209,7 +226,9 @@ describe("test vectors", () => {
         expect(open(), v.description).toEqual(v.frame);
       }
       else {
-        expect(failure(v.sealed_frame === null ? seal : open), v.description).toEqual(v.error);
+        expect(failure(v.sealed_frame === null
+          ? seal
+          : open), v.description).toEqual(v.error);
       }
     }
   });

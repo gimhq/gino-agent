@@ -147,7 +147,9 @@ function decode(text: string, field: string): Uint8Array {
 }
 
 function partyKind(partyId: string): E2eePartyKind {
-  return partyId.startsWith(CLIENT_PARTY_PREFIX) ? "client" : "agent";
+  return partyId.startsWith(CLIENT_PARTY_PREFIX)
+    ? "client"
+    : "agent";
 }
 
 /**
@@ -215,7 +217,11 @@ export class E2eeRelay extends E2eeDirectory {
       epoch: scope.epoch,
       drop_public_key: encodeB64url(scope.dropPublicKey),
       created_at: scope.createdAt,
-      members: this.repo.listMembers(scope.taskId).map(m => ({ leaf_index: m.leafIndex, party_id: m.partyId, kind: partyKind(m.partyId) })),
+      members: this.repo.listMembers(scope.taskId).map(m => ({
+        leaf_index: m.leafIndex,
+        party_id: m.partyId,
+        kind: partyKind(m.partyId),
+      })),
     };
   }
 
@@ -368,11 +374,18 @@ export class E2eeRelay extends E2eeDirectory {
     });
 
     const epoch = scope.epoch + 1;
-    const epochLink = input.epoch_link === undefined ? undefined : this.checkLink(decode(input.epoch_link, "epoch_link"), epoch);
-    const keyHistory = (input.key_history ?? []).map(entry => ({ kind: entry.kind, bytes: this.checkKeyHistory(scope, entry, epoch) }));
+    const epochLink = input.epoch_link === undefined
+      ? undefined
+      : this.checkLink(decode(input.epoch_link, "epoch_link"), epoch);
+    const keyHistory = (input.key_history ?? []).map(entry => ({
+      kind: entry.kind,
+      bytes: this.checkKeyHistory(scope, entry, epoch),
+    }));
 
     const occupied = new Set(members.map(m => m.leafIndex));
-    const removeLeaves = [...new Set(info.removes)];
+    const removeLeaves = [
+      ...new Set(info.removes),
+    ];
     for (const leaf of removeLeaves) {
       if (!occupied.delete(leaf)) {
         throw malformed(`leaf ${leaf} is blank`);
@@ -387,7 +400,9 @@ export class E2eeRelay extends E2eeDirectory {
       occupied.add(next);
       return { leafIndex: next, partyId: addedParty };
     });
-    const welcomeParties = [...new Set(addedParties)];
+    const welcomeParties = [
+      ...new Set(addedParties),
+    ];
 
     const now = this.deps.clock();
     const result = this.repo.acceptCommit({
@@ -396,11 +411,23 @@ export class E2eeRelay extends E2eeDirectory {
       bytes: commit,
       submitterPartyId: partyId,
       dropPublicKey,
-      ...(epochLink ? { epochLink } : {}),
-      ...(keyHistory.length > 0 ? { keyHistory } : {}),
-      ...(welcome ? { welcomes: welcomeParties.map(p => ({ partyId: p, bytes: welcome })) } : {}),
-      ...(removeLeaves.length > 0 ? { removeLeaves } : {}),
-      ...(add.length > 0 ? { add } : {}),
+      ...(epochLink
+        ? { epochLink }
+        : {}),
+      ...(keyHistory.length > 0
+        ? { keyHistory }
+        : {}),
+      ...(welcome
+        ? {
+            welcomes: welcomeParties.map(p => ({ partyId: p, bytes: welcome })),
+          }
+        : {}),
+      ...(removeLeaves.length > 0
+        ? { removeLeaves }
+        : {}),
+      ...(add.length > 0
+        ? { add }
+        : {}),
       acceptedAt: now,
     });
     if (!result.ok) {
@@ -411,7 +438,9 @@ export class E2eeRelay extends E2eeDirectory {
     }
 
     const removedLeaves = new Set(removeLeaves);
-    const removed = [...new Set(members.filter(m => removedLeaves.has(m.leafIndex)).map(m => m.partyId))]
+    const removed = [
+      ...new Set(members.filter(m => removedLeaves.has(m.leafIndex)).map(m => m.partyId)),
+    ]
       .filter(p => !this.repo.isMember(taskId, p));
     for (const removedParty of removed) {
       this.repo.dropUnackedWelcomes(taskId, removedParty);
@@ -427,14 +456,33 @@ export class E2eeRelay extends E2eeDirectory {
     }
     this.deliverToMembers(taskId);
 
-    this.deps.logger.info({ taskId, seq: result.seq, epoch: result.epoch, submitter: partyId, added: welcomeParties, removed }, "e2ee commit accepted");
-    this.deps.emit("e2ee.commit", { taskId, seq: result.seq, epoch: result.epoch, submitter: partyId, added: welcomeParties, removed });
+    this.deps.logger.info({
+      taskId,
+      seq: result.seq,
+      epoch: result.epoch,
+      submitter: partyId,
+      added: welcomeParties,
+      removed,
+    }, "e2ee commit accepted");
+    this.deps.emit("e2ee.commit", {
+      taskId,
+      seq: result.seq,
+      epoch: result.epoch,
+      submitter: partyId,
+      added: welcomeParties,
+      removed,
+    });
     return { seq: result.seq, epoch: result.epoch };
   }
 
   private rejected(taskId: string, partyId: string, err: unknown): void {
     if (err instanceof E2eeDsError) {
-      this.deps.logger.debug({ taskId, partyId, code: err.dsCode, reason: err.message }, "e2ee DS request rejected");
+      this.deps.logger.debug({
+        taskId,
+        partyId,
+        code: err.dsCode,
+        reason: err.message,
+      }, "e2ee DS request rejected");
     }
   }
 
@@ -510,7 +558,9 @@ export class E2eeRelay extends E2eeDirectory {
   scope(taskId: string): E2eeScopeView | undefined {
     this.ready();
     const scope = this.repo.getScope(taskId);
-    return scope ? this.scopeView(scope) : undefined;
+    return scope
+      ? this.scopeView(scope)
+      : undefined;
   }
 
   /** Whether the task is encrypted (has a scope); once true, always true. */
@@ -527,7 +577,9 @@ export class E2eeRelay extends E2eeDirectory {
   currentDropPublicKey(taskId: string): string | undefined {
     this.ready();
     const scope = this.repo.getScope(taskId);
-    return scope ? encodeB64url(scope.dropPublicKey) : undefined;
+    return scope
+      ? encodeB64url(scope.dropPublicKey)
+      : undefined;
   }
 
   /**
@@ -567,7 +619,14 @@ export class E2eeRelay extends E2eeDirectory {
       const bytes = decode(input.proposal, "proposal");
       const info = this.inspectFor(scope, bytes, "proposal");
       this.checkSender(scope, this.repo.listMembers(taskId), info, input.party_id);
-      const result = this.repo.appendEntry({ taskId, expectedEpoch: scope.epoch, kind: "proposal", bytes, submitterPartyId: input.party_id, acceptedAt: this.deps.clock() });
+      const result = this.repo.appendEntry({
+        taskId,
+        expectedEpoch: scope.epoch,
+        kind: "proposal",
+        bytes,
+        submitterPartyId: input.party_id,
+        acceptedAt: this.deps.clock(),
+      });
       if (!result.ok) {
         if (result.code === "no_scope") {
           throw new RelayNotFoundError("e2ee scope", taskId);
@@ -588,7 +647,9 @@ export class E2eeRelay extends E2eeDirectory {
       this.requireScope(taskId);
       this.requireMember(taskId, partyId);
       const link = this.repo.getEpochLink(taskId, epoch);
-      return link ? encodeB64url(link) : undefined;
+      return link
+        ? encodeB64url(link)
+        : undefined;
     });
   }
 
@@ -625,14 +686,23 @@ export class E2eeRelay extends E2eeDirectory {
       const page = "afterSeq" in cursor
         ? this.repo.readLog(taskId, cursor.afterSeq, E2EE_LOG_PAGE_LIMIT)
         : this.repo.readLogFromEpoch(taskId, cursor.fromEpoch, E2EE_LOG_PAGE_LIMIT);
-      return { entries: page.entries.map(logEntryData), more: page.more, epoch: scope.epoch };
+      return {
+        entries: page.entries.map(logEntryData),
+        more: page.more,
+        epoch: scope.epoch,
+      };
     });
   }
 
   /** The party's unacked Welcomes (only `taskId`'s when given), oldest first. */
   welcomes(partyId: string, taskId?: string): E2eeWelcomeView[] {
     this.ready();
-    return this.repo.listUnackedWelcomes(partyId, taskId).map(w => ({ id: w.id, task_id: w.taskId, seq: w.seq, welcome: encodeB64url(w.bytes) }));
+    return this.repo.listUnackedWelcomes(partyId, taskId).map(w => ({
+      id: w.id,
+      task_id: w.taskId,
+      seq: w.seq,
+      welcome: encodeB64url(w.bytes),
+    }));
   }
 
   /**
@@ -656,18 +726,33 @@ export class E2eeRelay extends E2eeDirectory {
   private runAgentRequest(agentId: string, taskId: string, request: E2eeRequestData): E2eeResponseData {
     switch (request.op) {
       case "log":
-        return { ok: true, ...this.readLog(taskId, agentId, { afterSeq: request.after_seq }) };
+        return {
+          ok: true,
+          ...this.readLog(taskId, agentId, { afterSeq: request.after_seq }),
+        };
       case "log_from_epoch":
-        return { ok: true, ...this.readLog(taskId, agentId, { fromEpoch: request.epoch }) };
+        return {
+          ok: true,
+          ...this.readLog(taskId, agentId, { fromEpoch: request.epoch }),
+        };
       case "link": {
         const link = this.epochLink(taskId, request.epoch, agentId);
-        return { ok: true, epoch: this.requireScope(taskId).epoch, ...(link !== undefined ? { link } : {}) };
+        return {
+          ok: true,
+          epoch: this.requireScope(taskId).epoch,
+          ...(link !== undefined
+            ? { link }
+            : {}),
+        };
       }
       case "put_link":
         this.putEpochLink(taskId, request.epoch, agentId, request.link);
         return { ok: true, epoch: this.requireScope(taskId).epoch };
       case "commit":
-        return { ok: true, ...this.guarded(taskId, agentId, () => this.acceptCommit(taskId, agentId, request, true)) };
+        return {
+          ok: true,
+          ...this.guarded(taskId, agentId, () => this.acceptCommit(taskId, agentId, request, true)),
+        };
     }
   }
 
@@ -676,8 +761,12 @@ export class E2eeRelay extends E2eeDirectory {
     return {
       ok: false,
       error: { code: err.dsCode, message: err.message },
-      ...(epoch !== undefined ? { epoch } : {}),
-      ...(err.link !== undefined ? { link: err.link } : {}),
+      ...(epoch !== undefined
+        ? { epoch }
+        : {}),
+      ...(err.link !== undefined
+        ? { link: err.link }
+        : {}),
     };
   }
 
@@ -713,6 +802,11 @@ export class E2eeRelay extends E2eeDirectory {
         }
       }
     }
-    this.deps.agents.send(agentId, { type: "e2ee_response", taskId, reqId, data });
+    this.deps.agents.send(agentId, {
+      type: "e2ee_response",
+      taskId,
+      reqId,
+      data,
+    });
   }
 }

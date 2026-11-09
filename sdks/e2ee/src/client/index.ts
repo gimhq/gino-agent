@@ -323,7 +323,11 @@ export class E2eeClient {
     const party = await this.api.post<PartyView>("/e2ee/clients", {
       client_id: this.clientId,
       public_key: publicKey,
-      capability: { versions: [1], mls_suites: [1], credential: { type: "basic", public_key: publicKey } },
+      capability: {
+        versions: [1],
+        mls_suites: [1],
+        credential: { type: "basic", public_key: publicKey },
+      },
     });
     const keyPackages = await this.publishKeyPackages(options.oneTime ?? 10, true);
     return { party, keyPackages };
@@ -332,11 +336,17 @@ export class E2eeClient {
   /** Generates and publishes KeyPackages; their private keys are persisted before the upload. */
   async publishKeyPackages(oneTime: number, lastResort = false): Promise<KeyPackagePoolStatus> {
     const pool = Array.from({ length: oneTime }, () => encodeB64url(this.keyPackages.generate(this.identity)));
-    const resort = lastResort ? encodeB64url(this.keyPackages.generate(this.identity, true)) : undefined;
+    const resort = lastResort
+      ? encodeB64url(this.keyPackages.generate(this.identity, true))
+      : undefined;
     await this.persist();
     return this.api.post<KeyPackagePoolStatus>(`/e2ee/parties/${encodeURIComponent(this.partyId)}/key-packages`, {
-      ...(pool.length > 0 ? { one_time: pool } : {}),
-      ...(resort !== undefined ? { last_resort: resort } : {}),
+      ...(pool.length > 0
+        ? { one_time: pool }
+        : {}),
+      ...(resort !== undefined
+        ? { last_resort: resort }
+        : {}),
     });
   }
 
@@ -395,7 +405,9 @@ export class E2eeClient {
       ...accepted,
       party: claim.party,
       lastResort: claim.last_resort,
-      ...(claim.party.key_change_warning ? { keyChangeWarning: claim.party.key_change_warning } : {}),
+      ...(claim.party.key_change_warning
+        ? { keyChangeWarning: claim.party.key_change_warning }
+        : {}),
     };
   }
 
@@ -436,13 +448,30 @@ export class E2eeClient {
           party_id: this.partyId,
           commit: encodeB64url(unit.commit),
           drop_public_key: encodeB64url(unit.dropPublicKey),
-          ...(unit.welcome ? { welcome: encodeB64url(unit.welcome) } : {}),
-          ...(unit.epochLink ? { epoch_link: encodeB64url(unit.epochLink) } : {}),
-          ...(unit.keyHistory.length > 0 ? { key_history: unit.keyHistory.map(r => ({ kind: r.kind, message: encodeB64url(r.bytes) })) } : {}),
+          ...(unit.welcome
+            ? {
+                welcome: encodeB64url(unit.welcome),
+              }
+            : {}),
+          ...(unit.epochLink
+            ? {
+                epoch_link: encodeB64url(unit.epochLink),
+              }
+            : {}),
+          ...(unit.keyHistory.length > 0
+            ? {
+                key_history: unit.keyHistory.map(r => ({
+                  kind: r.kind,
+                  message: encodeB64url(r.bytes),
+                })),
+              }
+            : {}),
         });
       }
       catch (error) {
-        const seq = error instanceof E2eeClientError ? undefined : await this.findCommit(taskId, unit).catch(() => undefined);
+        const seq = error instanceof E2eeClientError
+          ? undefined
+          : await this.findCommit(taskId, unit).catch(() => undefined);
         if (seq !== undefined) {
           accepted = { seq, epoch: unit.epoch + 1 };
         }
@@ -465,7 +494,9 @@ export class E2eeClient {
   private async findCommit(taskId: string, unit: CommitUnit): Promise<number | undefined> {
     const page = await this.readLog(taskId, `from_epoch=${unit.epoch}`);
     const entry = page.entries.find(e => e.kind === "commit" && e.epoch === unit.epoch);
-    return entry && sameBytes(decodeB64url(entry.message), unit.commit) ? entry.seq : undefined;
+    return entry && sameBytes(decodeB64url(entry.message), unit.commit)
+      ? entry.seq
+      : undefined;
   }
 
   private readLog(taskId: string, cursor: string): Promise<LogPage> {
@@ -478,7 +509,9 @@ export class E2eeClient {
     const welcomes = await this.api.get<Array<{ id: number; seq: number; welcome: string }>>(
       `/e2ee/parties/${party}/welcomes?task_id=${encodeURIComponent(taskId)}`,
     );
-    const newest = welcomes.reduce<(typeof welcomes)[number] | undefined>((best, w) => (best && best.seq > w.seq ? best : w), undefined);
+    const newest = welcomes.reduce<(typeof welcomes)[number] | undefined>((best, w) => (best && best.seq > w.seq
+      ? best
+      : w), undefined);
     if (!newest)
       throw new E2eeClientError("no_welcome", `no Welcome for task ${taskId}`);
     const group = ScopeGroup.join(this.keyPackages, PROFILE, taskId, decodeB64url(newest.welcome), newest.seq);
@@ -503,7 +536,9 @@ export class E2eeClient {
           kind: entry.kind,
           epoch: entry.epoch,
           bytes: decodeB64url(entry.message),
-          dropPublicKey: entry.drop_public_key === undefined ? null : decodeB64url(entry.drop_public_key),
+          dropPublicKey: entry.drop_public_key === undefined
+            ? null
+            : decodeB64url(entry.drop_public_key),
         }));
       }
       if (!page.more || page.entries.length === 0)
@@ -519,13 +554,21 @@ export class E2eeClient {
 
   /** Seals a prompt as `message.data.text` under the current epoch. */
   sealPrompt(taskId: string, text: string): SealedValue {
-    const frame = { type: "message", taskId, data: { text } };
+    const frame = {
+      type: "message",
+      taskId,
+      data: { text },
+    };
     return this.requireGroup(taskId).sealFrame<{ data: { text: SealedValue } }>(this.engine, "message", frame).data.text;
   }
 
   /** Seals a cron's `prompt` (`cron_upsert.data.prompt`) for `POST`/`PUT /admin/tasks/:id/crons`. */
   sealCronPrompt(taskId: string, prompt: string): SealedValue {
-    const frame = { type: "cron_upsert", taskId, data: { prompt } };
+    const frame = {
+      type: "cron_upsert",
+      taskId,
+      data: { prompt },
+    };
     return this.requireGroup(taskId).sealFrame<{ data: { prompt: SealedValue } }>(this.engine, "cron_upsert", frame).data.prompt;
   }
 
@@ -539,12 +582,25 @@ export class E2eeClient {
     const group = this.requireGroup(taskId);
     const { epoch, k } = group.current();
     const sealed = sealFile(k, epoch, fileLocation(taskId), bytes);
-    const frame = { type: "message", taskId, data: { attachments: [{ name, sha256: sealed.sha256 }] } };
+    const frame = {
+      type: "message",
+      taskId,
+      data: {
+        attachments: [
+          { name, sha256: sealed.sha256 },
+        ],
+      },
+    };
     const sealedName = group.sealFrame<{ data: { attachments: Array<{ name: SealedValue }> } }>(this.engine, "message", frame).data.attachments[0]!.name;
     return {
       uploadName: `${sealed.sha256}.bin`,
       envelope: sealed.envelope,
-      descriptor: { name: sealedName, content_type: "application/octet-stream", size: sealed.size, sha256: sealed.sha256 },
+      descriptor: {
+        name: sealedName,
+        content_type: "application/octet-stream",
+        size: sealed.size,
+        sha256: sealed.sha256,
+      },
     };
   }
 
@@ -559,8 +615,12 @@ export class E2eeClient {
   sendPrompt(taskId: string, text: string, options: { attachments?: AttachmentDescriptorInput[]; newThread?: boolean } = {}): Promise<SentMessage> {
     return this.api.post<SentMessage>(`/tasks/${encodeURIComponent(taskId)}/message`, {
       text: this.sealPrompt(taskId, text),
-      ...(options.attachments ? { attachments: options.attachments } : {}),
-      ...(options.newThread !== undefined ? { new_thread: options.newThread } : {}),
+      ...(options.attachments
+        ? { attachments: options.attachments }
+        : {}),
+      ...(options.newThread !== undefined
+        ? { new_thread: options.newThread }
+        : {}),
     });
   }
 
@@ -569,7 +629,9 @@ export class E2eeClient {
 
   private fetchLink(taskId: string, epoch: number): Promise<Uint8Array | null> {
     return this.api.get<{ link?: string }>(`/e2ee/scopes/${encodeURIComponent(taskId)}/links/${epoch}?party_id=${encodeURIComponent(this.partyId)}`)
-      .then(r => (r.link === undefined ? null : decodeB64url(r.link)));
+      .then(r => (r.link === undefined
+        ? null
+        : decodeB64url(r.link)));
   }
 
   /** Opens one value, fetching the epoch links the backward walk misses. */
@@ -618,7 +680,12 @@ export class E2eeClient {
         for (const field of ["content", "input", "output"] as const) {
           if (row[field] == null)
             continue;
-          const frame = { type: "thread_message", taskId, threadId, data: { seq: row.seq, kind: row.kind, [field]: row[field] } };
+          const frame = {
+            type: "thread_message",
+            taskId,
+            threadId,
+            data: { seq: row.seq, kind: row.kind, [field]: row[field] },
+          };
           message[field] = await this.openField<never>(taskId, "thread_message", frame, field);
         }
         opened.push(message);
@@ -637,11 +704,22 @@ export class E2eeClient {
     const { run } = await this.readThread(taskId, threadId, 0, 1);
     if (!run)
       return null;
-    const opened: OpenedResult = { status: run.status, outboxId: run.outboxId, failureReason: run.failureReason, encryptionError: run.encryptionError };
+    const opened: OpenedResult = {
+      status: run.status,
+      outboxId: run.outboxId,
+      failureReason: run.failureReason,
+      encryptionError: run.encryptionError,
+    };
     for (const field of ["result", "error"] as const) {
       if (run[field] == null)
         continue;
-      const frame = { type: "thread_result", taskId, threadId, outboxId: run.outboxId, data: { [field]: run[field] } };
+      const frame = {
+        type: "thread_result",
+        taskId,
+        threadId,
+        outboxId: run.outboxId,
+        data: { [field]: run[field] },
+      };
       opened[field] = await this.openField<string>(taskId, "thread_result", frame, field);
     }
     await this.persist();
@@ -650,7 +728,9 @@ export class E2eeClient {
 
   /** Lists a task's attachment descriptors, optionally of one thread. */
   listAttachments(taskId: string, threadId?: string): Promise<TaskAttachment[]> {
-    const query = threadId !== undefined ? `?thread=${encodeURIComponent(threadId)}` : "";
+    const query = threadId !== undefined
+      ? `?thread=${encodeURIComponent(threadId)}`
+      : "";
     return this.api.get<TaskAttachment[]>(`/tasks/${encodeURIComponent(taskId)}/attachments${query}`);
   }
 
@@ -665,11 +745,23 @@ export class E2eeClient {
    */
   async openOutputFile(file: OutputFileDescriptor, bytes: Uint8Array): Promise<{ name: Opened<string>; content: Opened<Uint8Array> }> {
     await this.catchUp(file.taskId);
-    const frame = { type: "thread_result", taskId: file.taskId, threadId: file.threadId, data: { attachments: [{ name: file.name, sha256: file.sha256 }] } };
+    const frame = {
+      type: "thread_result",
+      taskId: file.taskId,
+      threadId: file.threadId,
+      data: {
+        attachments: [
+          { name: file.name, sha256: file.sha256 },
+        ],
+      },
+    };
     const name = await this.openValue(file.taskId, group =>
       group.openFrame<{ data: { attachments: Array<{ name: string }> } }>(this.engine, "thread_result", frame).data.attachments[0]!.name);
     const content: Opened<Uint8Array> = await sha256Hex(bytes) !== file.sha256
-      ? { ok: false, error: new E2eeError({ code: "malformed", reason: "sha256 mismatch" }) }
+      ? {
+          ok: false,
+          error: new E2eeError({ code: "malformed", reason: "sha256 mismatch" }),
+        }
       : await this.openValue(file.taskId, group => group.open(bytes, fileLocation(file.taskId)));
     await this.persist();
     return { name, content };

@@ -49,8 +49,12 @@ export class AdminApi {
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = body !== undefined ? { "content-type": "application/json" } : {};
-    return this.envelope<T>(method, path, await this.send(method, path, headers, body !== undefined ? JSON.stringify(body) : undefined));
+    const headers: Record<string, string> = body !== undefined
+      ? { "content-type": "application/json" }
+      : {};
+    return this.envelope<T>(method, path, await this.send(method, path, headers, body !== undefined
+      ? JSON.stringify(body)
+      : undefined));
   }
 
   /** Posts raw bytes; the response is the JSON envelope. */
@@ -71,7 +75,9 @@ export class AdminApi {
     return this.fetch(`${this.baseUrl}${path}`, {
       method,
       headers: { authorization: `Bearer ${this.token}`, ...headers },
-      ...(body !== undefined ? { body } : {}),
+      ...(body !== undefined
+        ? { body }
+        : {}),
     });
   }
 

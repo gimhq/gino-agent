@@ -25,11 +25,23 @@ class Ds {
   /** Accepts a commit unit and returns the `seq` of its commit. */
   accept(unit: CommitUnit): number {
     const seq = this.log.length + 1;
-    this.log.push({ seq, kind: "commit", epoch: unit.epoch, bytes: unit.commit, dropPublicKey: unit.dropPublicKey });
+    this.log.push({
+      seq,
+      kind: "commit",
+      epoch: unit.epoch,
+      bytes: unit.commit,
+      dropPublicKey: unit.dropPublicKey,
+    });
     if (unit.epochLink !== null)
       this.links.set(unit.epoch + 1, unit.epochLink);
-    for (const record of unit.keyHistory)
-      this.log.push({ seq: this.log.length + 1, kind: record.kind, epoch: unit.epoch + 1, bytes: record.bytes });
+    for (const record of unit.keyHistory) {
+      this.log.push({
+        seq: this.log.length + 1,
+        kind: record.kind,
+        epoch: unit.epoch + 1,
+        bytes: record.bytes,
+      });
+    }
     return seq;
   }
 
@@ -59,11 +71,21 @@ function twoMembers(policy: "full" | "from_join" = "full") {
   const aliceGroup = ScopeGroup.create(alice, PROFILE, SCOPE, policy);
   const epoch0 = aliceGroup.sealContent(LOCATION, text.encode("before bob"));
   const bobKeyPackages = new KeyPackageStore();
-  const unit = aliceGroup.addMembers(alice, [bobKeyPackages.generate(bob)]);
+  const unit = aliceGroup.addMembers(alice, [
+    bobKeyPackages.generate(bob),
+  ]);
   const seq = ds.accept(unit);
   aliceGroup.commitAccepted(seq);
   const bobGroup = ScopeGroup.join(bobKeyPackages, PROFILE, SCOPE, unit.welcome!, seq);
-  return { ds, alice, bob, aliceGroup, bobGroup, epoch0, unit };
+  return {
+    ds,
+    alice,
+    bob,
+    aliceGroup,
+    bobGroup,
+    epoch0,
+    unit,
+  };
 }
 
 beforeAll(async () => {
@@ -90,7 +112,11 @@ describe("scope group", () => {
     expect(new TextDecoder().decode(bobGroup.open(envelope, LOCATION))).toBe("hello");
 
     const engine = FieldMapEngine.forProfile(PROFILE);
-    const frame = { type: "message", taskId: SCOPE, data: { text: "summarize" } };
+    const frame = {
+      type: "message",
+      taskId: SCOPE,
+      data: { text: "summarize" },
+    };
     const sealed = aliceGroup.sealFrame<{ data: { text: { e2ee: string } } }>(engine, "message", frame);
     expect(typeof sealed.data.text.e2ee).toBe("string");
     expect(bobGroup.openFrame<typeof frame>(engine, "message", sealed)).toEqual(frame);
@@ -118,7 +144,9 @@ describe("scope group", () => {
 
     const carol = Identity.generate();
     const carolStore = new KeyPackageStore();
-    const unit = aliceGroup.addMembers(alice, [carolStore.generate(carol)], { fromEpoch: 0, sealed: true });
+    const unit = aliceGroup.addMembers(alice, [
+      carolStore.generate(carol),
+    ], { fromEpoch: 0, sealed: true });
     expect(unit.epochLink).toBeNull();
     expect(unit.keyHistory.map(r => r.kind)).toEqual(["key_history_sealed"]);
     const seq = ds.accept(unit);
@@ -131,7 +159,9 @@ describe("scope group", () => {
 
     const dave = Identity.generate();
     const daveStore = new KeyPackageStore();
-    const daveUnit = aliceGroup.addMembers(alice, [daveStore.generate(dave)]);
+    const daveUnit = aliceGroup.addMembers(alice, [
+      daveStore.generate(dave),
+    ]);
     const daveSeq = ds.accept(daveUnit);
     aliceGroup.commitAccepted(daveSeq);
     ds.catchUp(carolGroup);

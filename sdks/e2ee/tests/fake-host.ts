@@ -85,31 +85,66 @@ export class FakeHost {
     const url = new URL(input);
     expect(url.origin + url.pathname.slice(0, "/api/admin".length)).toBe(BASE);
     expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${TOKEN}`);
-    const body = init.body instanceof Uint8Array ? init.body : init.body ? JSON.parse(String(init.body)) : undefined;
-    const call: Call = { method: init.method ?? "GET", path: url.pathname.slice("/api/admin".length), body };
+    const body = init.body instanceof Uint8Array
+      ? init.body
+      : init.body
+        ? JSON.parse(String(init.body))
+        : undefined;
+    const call: Call = {
+      method: init.method ?? "GET",
+      path: url.pathname.slice("/api/admin".length),
+      body,
+    };
     this.calls.push(call);
     try {
       this.before?.(call);
       const data = this.route(call, url.searchParams);
       this.after?.(call);
-      if (data instanceof Uint8Array)
-        return new Response(data as Uint8Array<ArrayBuffer>, { headers: { "content-type": "application/octet-stream" } });
+      if (data instanceof Uint8Array) {
+        return new Response(data as Uint8Array<ArrayBuffer>, {
+          headers: { "content-type": "application/octet-stream" },
+        });
+      }
       return Response.json({ success: true, data });
     }
     catch (error) {
-      if (error instanceof HttpError)
-        return Response.json({ success: false, error: { code: error.code, message: error.code, ...(error.details !== undefined ? { details: error.details } : {}) } }, { status: error.status });
+      if (error instanceof HttpError) {
+        return Response.json({
+          success: false,
+          error: {
+            code: error.code,
+            message: error.code,
+            ...(error.details !== undefined
+              ? { details: error.details }
+              : {}),
+          },
+        }, { status: error.status });
+      }
       throw error;
     }
   };
 
   /** Registers an agent party with its pinned key (what `POST /agent/register` does). */
   registerAgent(agentId: string, publicKey: Uint8Array): void {
-    this.parties.set(agentId, { publicKey: encodeB64url(publicKey), oneTime: [] });
+    this.parties.set(agentId, {
+      publicKey: encodeB64url(publicKey),
+      oneTime: [],
+    });
   }
 
   publish(partyId: string, oneTime: Uint8Array[], lastResort?: Uint8Array): void {
-    this.route({ method: "POST", path: `/e2ee/parties/${partyId}/key-packages`, body: { one_time: oneTime.map(encodeB64url), ...(lastResort ? { last_resort: encodeB64url(lastResort) } : {}) } }, new URLSearchParams());
+    this.route({
+      method: "POST",
+      path: `/e2ee/parties/${partyId}/key-packages`,
+      body: {
+        one_time: oneTime.map(encodeB64url),
+        ...(lastResort
+          ? {
+              last_resort: encodeB64url(lastResort),
+            }
+          : {}),
+      },
+    }, new URLSearchParams());
   }
 
   /** Accepts a commit unit submitted outside the client (another member). */
@@ -121,8 +156,16 @@ export class FakeHost {
         party_id: partyId,
         commit: encodeB64url(unit.commit),
         drop_public_key: encodeB64url(unit.dropPublicKey),
-        ...(unit.welcome ? { welcome: encodeB64url(unit.welcome) } : {}),
-        ...(unit.epochLink ? { epoch_link: encodeB64url(unit.epochLink) } : {}),
+        ...(unit.welcome
+          ? {
+              welcome: encodeB64url(unit.welcome),
+            }
+          : {}),
+        ...(unit.epochLink
+          ? {
+              epoch_link: encodeB64url(unit.epochLink),
+            }
+          : {}),
       },
     }, new URLSearchParams()) as { seq: number; epoch: number };
   }
@@ -133,7 +176,9 @@ export class FakeHost {
       kind: e.kind as "commit",
       epoch: e.epoch,
       bytes: decodeB64url(e.message),
-      dropPublicKey: e.drop_public_key ? decodeB64url(e.drop_public_key) : null,
+      dropPublicKey: e.drop_public_key
+        ? decodeB64url(e.drop_public_key)
+        : null,
     }));
   }
 
@@ -151,7 +196,16 @@ export class FakeHost {
       partyId,
       fingerprint: fingerprint(key),
       fingerprint_display: fingerprintDisplay(key),
-      ...(party.pendingKey ? { key_change_warning: { pinned_fingerprint: fingerprint(key), pending_fingerprint: fingerprint(decodeB64url(party.pendingKey)), pending_fingerprint_display: "", changed_at: 0 } } : {}),
+      ...(party.pendingKey
+        ? {
+            key_change_warning: {
+              pinned_fingerprint: fingerprint(key),
+              pending_fingerprint: fingerprint(decodeB64url(party.pendingKey)),
+              pending_fingerprint_display: "",
+              changed_at: 0,
+            },
+          }
+        : {}),
     };
   }
 
@@ -159,7 +213,9 @@ export class FakeHost {
     const party = this.party(partyId);
     return {
       ...this.summary(partyId),
-      kind: partyId.startsWith("client:") ? "client" : "agent",
+      kind: partyId.startsWith("client:")
+        ? "client"
+        : "agent",
       public_key: party.publicKey,
       capability: null,
       capable: true,
@@ -186,10 +242,15 @@ export class FakeHost {
     if (key === "POST " && at("/e2ee/clients")) {
       const partyId = `client:${str("client_id")}`;
       const existing = this.parties.get(partyId);
-      if (!existing)
-        this.parties.set(partyId, { publicKey: str("public_key"), oneTime: [] });
-      else if (existing.publicKey !== str("public_key"))
+      if (!existing) {
+        this.parties.set(partyId, {
+          publicKey: str("public_key"),
+          oneTime: [],
+        });
+      }
+      else if (existing.publicKey !== str("public_key")) {
         existing.pendingKey = str("public_key");
+      }
       return this.view(partyId);
     }
     if (key === "GET " && at("/e2ee/parties/:id"))
@@ -198,10 +259,18 @@ export class FakeHost {
       const party = this.party(parts[2]!);
       const rejected: Array<{ code: string; index?: number }> = [];
       const valid = (kp: string) => hexOf(inspectKeyPackage(decodeB64url(kp)).publicKey) === hexOf(decodeB64url(party.publicKey));
-      (b.one_time as string[] | undefined ?? []).forEach((kp, index) => (valid(kp) ? party.oneTime.push(kp) : rejected.push({ code: "malformed", index })));
+      (b.one_time as string[] | undefined ?? []).forEach((kp, index) => (valid(kp)
+        ? party.oneTime.push(kp)
+        : rejected.push({ code: "malformed", index })));
       if (str("last_resort"))
         party.lastResort = str("last_resort");
-      return { one_time: party.oneTime.length, last_resort: party.lastResort !== undefined, ...(rejected.length > 0 ? { rejected } : {}) };
+      return {
+        one_time: party.oneTime.length,
+        last_resort: party.lastResort !== undefined,
+        ...(rejected.length > 0
+          ? { rejected }
+          : {}),
+      };
     }
     if (key === "POST " && at("/e2ee/parties/:id/key-packages/claim")) {
       const partyId = parts[2]!;
@@ -212,7 +281,11 @@ export class FakeHost {
       if (!kp)
         throw new HttpError(409, "no_key_package");
       this.claimed.set(hexOf(inspectKeyPackage(decodeB64url(kp)).ref), partyId);
-      return { key_package: kp, last_resort: kp === party.lastResort, party: this.summary(partyId) };
+      return {
+        key_package: kp,
+        last_resort: kp === party.lastResort,
+        party: this.summary(partyId),
+      };
     }
     if (key === "GET " && at("/e2ee/parties/:id/welcomes")) {
       return this.welcomes.filter(w => w.partyId === parts[2] && !w.acked && (!query.get("task_id") || w.task_id === query.get("task_id")))
@@ -231,17 +304,37 @@ export class FakeHost {
       if (info.epoch !== scope.epoch)
         throw new HttpError(409, "epoch_conflict", { epoch: scope.epoch });
       const seq = scope.log.length + 1;
-      scope.log.push({ seq, kind: "commit", epoch: scope.epoch, message: str("commit"), drop_public_key: str("drop_public_key") });
+      scope.log.push({
+        seq,
+        kind: "commit",
+        epoch: scope.epoch,
+        message: str("commit"),
+        drop_public_key: str("drop_public_key"),
+      });
       scope.epoch += 1;
       if (str("epoch_link"))
         scope.links.set(scope.epoch, str("epoch_link"));
-      for (const record of (b.key_history as Array<{ kind: string; message: string }> | undefined) ?? [])
-        scope.log.push({ seq: scope.log.length + 1, kind: record.kind, epoch: scope.epoch, message: record.message });
+      for (const record of (b.key_history as Array<{ kind: string; message: string }> | undefined) ?? []) {
+        scope.log.push({
+          seq: scope.log.length + 1,
+          kind: record.kind,
+          epoch: scope.epoch,
+          message: record.message,
+        });
+      }
       if (str("welcome")) {
         for (const ref of welcomeRecipients(decodeB64url(str("welcome")))) {
           const partyId = this.claimed.get(hexOf(ref));
-          if (partyId)
-            this.welcomes.push({ id: this.welcomes.length + 1, partyId, task_id: parts[2]!, seq, welcome: str("welcome"), acked: false });
+          if (partyId) {
+            this.welcomes.push({
+              id: this.welcomes.length + 1,
+              partyId,
+              task_id: parts[2]!,
+              seq,
+              welcome: str("welcome"),
+              acked: false,
+            });
+          }
         }
       }
       return { seq, epoch: scope.epoch };
@@ -256,19 +349,33 @@ export class FakeHost {
     }
     if (key === "GET " && at("/e2ee/scopes/:task/links/:epoch")) {
       const link = this.scope(parts[2]!).links.get(Number(parts[4]));
-      return link === undefined ? {} : { link };
+      return link === undefined
+        ? {}
+        : { link };
     }
     if (key === "POST " && at("/tasks")) {
       expect(b.e2ee).toBeDefined();
-      this.scopes.set(str("id"), { epoch: 0, log: [], links: new Map() });
-      const task = { ...b, agentId: null, status: "pending-assignment", e2ee: { ...(b.e2ee as object), epoch: 0 } };
+      this.scopes.set(str("id"), {
+        epoch: 0,
+        log: [],
+        links: new Map(),
+      });
+      const task = {
+        ...b,
+        agentId: null,
+        status: "pending-assignment",
+        e2ee: { ...(b.e2ee as object), epoch: 0 },
+      };
       this.tasks.set(str("id"), task);
       return { task, dispatch: null };
     }
     if (key === "POST " && at("/tasks/:id/assign")) {
       const task = this.tasks.get(parts[1]!)!;
       task.agentId = str("agent_id");
-      return { placed: true, agentId: str("agent_id") };
+      return {
+        placed: true,
+        agentId: str("agent_id"),
+      };
     }
     if (key === "POST " && at("/tasks/:id/attachments")) {
       const bytes = body as Uint8Array;
@@ -276,9 +383,26 @@ export class FakeHost {
       if (query.get("sha256") !== sha256 || query.get("name") !== `${sha256}.bin`)
         throw new HttpError(400, "SHA_MISMATCH");
       const id = `att-${this.attachments.length + 1}`;
-      const row = { id, taskId: parts[1]!, threadId: "th-1", name: query.get("name"), contentType: "application/octet-stream", size: bytes.length, sha256, direction: "inbound", createdAt: 0 };
+      const row = {
+        id,
+        taskId: parts[1]!,
+        threadId: "th-1",
+        name: query.get("name"),
+        contentType: "application/octet-stream",
+        size: bytes.length,
+        sha256,
+        direction: "inbound",
+        createdAt: 0,
+      };
       this.attachments.push({ row, bytes });
-      return { id, name: row.name, content_type: row.contentType, size: row.size, sha256, ref: `/agent/attachments/${id}` };
+      return {
+        id,
+        name: row.name,
+        content_type: row.contentType,
+        size: row.size,
+        sha256,
+        ref: `/agent/attachments/${id}`,
+      };
     }
     if (key === "GET " && at("/tasks/:id/attachments"))
       return this.attachments.map(a => a.row).filter(r => r.taskId === parts[1] && (!query.get("thread") || r.threadId === query.get("thread")));
@@ -295,7 +419,11 @@ export class FakeHost {
       const after = Number(query.get("after") ?? 0);
       const limit = Number(query.get("limit") ?? 200);
       const messages = (thread.messages as Array<{ seq: number }>).filter(m => m.seq > after).slice(0, limit);
-      return { threadId: query.get("thread"), run: thread.run, messages };
+      return {
+        threadId: query.get("thread"),
+        run: thread.run,
+        messages,
+      };
     }
     throw new HttpError(404, `no route ${method} ${path}`);
   }

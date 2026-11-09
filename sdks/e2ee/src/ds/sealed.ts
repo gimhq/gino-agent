@@ -31,9 +31,13 @@ function collect(node: unknown, segments: readonly string[], path: string, out: 
   }
   const [head = "", ...rest] = segments;
   const array = head.endsWith("[]");
-  const key = array ? head.slice(0, -2) : head;
+  const key = array
+    ? head.slice(0, -2)
+    : head;
   const child = (node as Record<string, unknown>)[key];
-  const childPath = path ? `${path}.${key}` : key;
+  const childPath = path
+    ? `${path}.${key}`
+    : key;
   if (!array) {
     collect(child, rest, childPath, out);
     return;
@@ -67,7 +71,9 @@ function applies(rule: FieldRule, frame: unknown): boolean {
     return true;
   }
   const equal = lookup(frame, rule.when.path) === rule.when.value;
-  return rule.when.op === "eq" ? equal : !equal;
+  return rule.when.op === "eq"
+    ? equal
+    : !equal;
 }
 
 /**

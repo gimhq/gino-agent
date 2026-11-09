@@ -48,7 +48,10 @@ export interface SealedValue {
 }
 
 export function splitSecrets(bytes: Uint8Array): EpochSecrets {
-  return { k: bytes.slice(0, 32), d: bytes.slice(32, 64) };
+  return {
+    k: bytes.slice(0, 32),
+    d: bytes.slice(32, 64),
+  };
 }
 
 /** base64url without padding. */
@@ -102,7 +105,9 @@ export function envelopeHeader(envelope: Uint8Array): { type: EnvelopeType; epoc
 }
 
 export function toSealedValue(envelope: Uint8Array): SealedValue {
-  return { e2ee: encodeB64url(envelope) };
+  return {
+    e2ee: encodeB64url(envelope),
+  };
 }
 
 /** The envelope of a mapped value: not sealed is `plaintext_rejected`, a bad sealed form `malformed`. */
@@ -135,7 +140,11 @@ export interface SealedFile {
 }
 
 export function fileDigest(envelope: Uint8Array): SealedFile {
-  return { envelope, sha256: wasm.fileSha256(envelope), size: envelope.length };
+  return {
+    envelope,
+    sha256: wasm.fileSha256(envelope),
+    size: envelope.length,
+  };
 }
 
 export function sealFile(k: Uint8Array, epoch: number, location: string, bytes: Uint8Array): SealedFile {
@@ -196,13 +205,21 @@ interface KeyHistoryJson {
 }
 
 function keyHistoryToJson(history: KeyHistory): string {
-  const entries = history.entries.map(e => ({ epoch: e.epoch, k: encodeB64url(e.k), d: encodeB64url(e.d) }));
+  const entries = history.entries.map(e => ({
+    epoch: e.epoch,
+    k: encodeB64url(e.k),
+    d: encodeB64url(e.d),
+  }));
   return JSON.stringify({ epoch: history.epoch, entries });
 }
 
 function keyHistoryFromJson(text: string): KeyHistory {
   const json = JSON.parse(text) as KeyHistoryJson;
-  const entries = json.entries.map(e => ({ epoch: e.epoch, k: decodeB64url(e.k), d: decodeB64url(e.d) }));
+  const entries = json.entries.map(e => ({
+    epoch: e.epoch,
+    k: decodeB64url(e.k),
+    d: decodeB64url(e.d),
+  }));
   return { epoch: json.epoch, entries };
 }
 
@@ -263,7 +280,9 @@ export async function withEpochLinks<T>(target: LinkTarget, fetchLink: FetchLink
 }
 
 function optionalNumber(value: bigint | undefined): number | undefined {
-  return value === undefined ? undefined : Number(value);
+  return value === undefined
+    ? undefined
+    : Number(value);
 }
 
 /**
@@ -542,9 +561,16 @@ function commitUnit(text: string): CommitUnit {
     epoch: json.epoch,
     commit: decodeB64url(json.commit),
     dropPublicKey: decodeB64url(json.drop_public_key),
-    welcome: json.welcome === null ? null : decodeB64url(json.welcome),
-    epochLink: json.epoch_link === null ? null : decodeB64url(json.epoch_link),
-    keyHistory: json.key_history.map(r => ({ kind: r.kind, bytes: decodeB64url(r.bytes) })),
+    welcome: json.welcome === null
+      ? null
+      : decodeB64url(json.welcome),
+    epochLink: json.epoch_link === null
+      ? null
+      : decodeB64url(json.epoch_link),
+    keyHistory: json.key_history.map(r => ({
+      kind: r.kind,
+      bytes: decodeB64url(r.bytes),
+    })),
   };
 }
 
@@ -671,7 +697,9 @@ export class ScopeGroup implements LinkTarget {
   /** Commits the addition of the parties of `keyPackages`. */
   addMembers(identity: Identity, keyPackages: Uint8Array[], keyHistory?: KeyHistoryOffer): CommitUnit {
     const encoded = keyPackages.map(encodeB64url);
-    const from = keyHistory === undefined ? undefined : BigInt(keyHistory.fromEpoch);
+    const from = keyHistory === undefined
+      ? undefined
+      : BigInt(keyHistory.fromEpoch);
     return commitUnit(call(() => this.inner.addMembers(identity.inner, encoded, from, keyHistory?.sealed ?? false)));
   }
 
@@ -706,7 +734,9 @@ export class ScopeGroup implements LinkTarget {
       kind: entry.kind,
       epoch: entry.epoch,
       bytes: encodeB64url(entry.bytes),
-      drop_public_key: entry.dropPublicKey == null ? null : encodeB64url(entry.dropPublicKey),
+      drop_public_key: entry.dropPublicKey == null
+        ? null
+        : encodeB64url(entry.dropPublicKey),
     });
     const applied = JSON.parse(call(() => this.inner.apply(json))) as
       | Exclude<Applied, { type: "commit" }>

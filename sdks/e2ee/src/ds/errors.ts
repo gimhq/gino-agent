@@ -26,7 +26,13 @@ export class RelayError extends Error {
   toJSON(): RelayErrorBody {
     return {
       success: false,
-      error: { code: this.code, message: this.message, ...(this.details !== undefined ? { details: this.details } : {}) },
+      error: {
+        code: this.code,
+        message: this.message,
+        ...(this.details !== undefined
+          ? { details: this.details }
+          : {}),
+      },
     };
   }
 }
@@ -34,7 +40,9 @@ export class RelayError extends Error {
 /** `404` / `NOT_FOUND` — the addressed party, task, scope or Welcome does not exist. */
 export class RelayNotFoundError extends RelayError {
   constructor(resource: string, id?: string) {
-    super(id ? `${resource} ${id} not found` : `${resource} not found`, 404, "NOT_FOUND");
+    super(id
+      ? `${resource} ${id} not found`
+      : `${resource} not found`, 404, "NOT_FOUND");
     this.name = "RelayNotFoundError";
   }
 }
@@ -70,7 +78,11 @@ export class E2eeDsError extends RelayError {
     public readonly epoch?: number,
     public readonly link?: string,
   ) {
-    super(message, DS_STATUS[dsCode], dsCode, epoch !== undefined ? { epoch } : link !== undefined ? { link } : undefined);
+    super(message, DS_STATUS[dsCode], dsCode, epoch !== undefined
+      ? { epoch }
+      : link !== undefined
+        ? { link }
+        : undefined);
     this.name = "E2eeDsError";
   }
 }

@@ -30,14 +30,23 @@ let relay: E2eeRelay;
 let clients = 0;
 
 function capability(identity: Identity): Record<string, unknown> {
-  return { versions: [1], mls_suites: [1], credential: { type: "basic", public_key: b64(identity.publicKey) } };
+  return {
+    versions: [1],
+    mls_suites: [1],
+    credential: {
+      type: "basic",
+      public_key: b64(identity.publicKey),
+    },
+  };
 }
 
 function runner(agentId: string, keyPackages = 2): { identity: Identity; store: KeyPackageStore } {
   const identity = Identity.generate();
   const store = new KeyPackageStore();
   relay.observeAgentCapability(agentId, capability(identity));
-  relay.publishKeyPackages(agentId, { one_time: Array.from({ length: keyPackages }, () => b64(store.generate(identity))) });
+  relay.publishKeyPackages(agentId, {
+    one_time: Array.from({ length: keyPackages }, () => b64(store.generate(identity))),
+  });
   agents.online.add(agentId);
   return { identity, store };
 }
@@ -45,7 +54,10 @@ function runner(agentId: string, keyPackages = 2): { identity: Identity; store: 
 function client(): { partyId: string; identity: Identity } {
   const identity = Identity.generate();
   clients += 1;
-  const { partyId } = relay.enrollClient({ clientId: `device-${clients}`, publicKey: b64(identity.publicKey) });
+  const { partyId } = relay.enrollClient({
+    clientId: `device-${clients}`,
+    publicKey: b64(identity.publicKey),
+  });
   return { partyId, identity };
 }
 
@@ -53,7 +65,12 @@ function encryptedTask(taskId = "t-1"): { taskId: string; partyId: string; ident
   tasks.add(taskId);
   const { partyId, identity } = client();
   const group = ScopeGroup.create(identity, E2EE_PROFILE_ID, taskId);
-  relay.registerScope(taskId, { profile_id: E2EE_PROFILE_ID, group_id: b64(group.groupId), drop_public_key: b64(group.dropPublicKey()), creator: partyId });
+  relay.registerScope(taskId, {
+    profile_id: E2EE_PROFILE_ID,
+    group_id: b64(group.groupId),
+    drop_public_key: b64(group.dropPublicKey()),
+    creator: partyId,
+  });
   return { taskId, partyId, identity, group };
 }
 
@@ -62,9 +79,24 @@ function submission(partyId: string, unit: CommitUnit): E2eeCommitSubmission {
     party_id: partyId,
     commit: b64(unit.commit),
     drop_public_key: b64(unit.dropPublicKey),
-    ...(unit.welcome ? { welcome: b64(unit.welcome) } : {}),
-    ...(unit.epochLink ? { epoch_link: b64(unit.epochLink) } : {}),
-    ...(unit.keyHistory.length > 0 ? { key_history: unit.keyHistory.map(k => ({ kind: k.kind, message: b64(k.bytes) })) } : {}),
+    ...(unit.welcome
+      ? {
+          welcome: b64(unit.welcome),
+        }
+      : {}),
+    ...(unit.epochLink
+      ? {
+          epoch_link: b64(unit.epochLink),
+        }
+      : {}),
+    ...(unit.keyHistory.length > 0
+      ? {
+          key_history: unit.keyHistory.map(k => ({
+            kind: k.kind,
+            message: b64(k.bytes),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -81,7 +113,11 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  agents = { online: new Set(), sent: [], queued: [] };
+  agents = {
+    online: new Set(),
+    sent: [],
+    queued: [],
+  };
   tasks = new Set();
   events = [];
   relay = new E2eeRelay({
@@ -119,7 +155,13 @@ describe("key directory", () => {
       }
     })();
     expect(refused).toBeInstanceOf(RelayError);
-    expect((refused as RelayError).toJSON()).toEqual({ success: false, error: { code: "key_changed", message: expect.any(String) } });
+    expect((refused as RelayError).toJSON()).toEqual({
+      success: false,
+      error: {
+        code: "key_changed",
+        message: expect.any(String),
+      },
+    });
 
     const repinned = relay.repin("agent-1");
     expect(repinned.fingerprint).toBe(changed.key_change_warning!.pending_fingerprint);
@@ -130,7 +172,14 @@ describe("key directory", () => {
 
   it("ignores an absent or invalid capability", () => {
     relay.observeAgentCapability("agent-1", undefined);
-    relay.observeAgentCapability("agent-1", { versions: [2], mls_suites: [1], credential: { type: "basic", public_key: b64(new Uint8Array(32)) } });
+    relay.observeAgentCapability("agent-1", {
+      versions: [2],
+      mls_suites: [1],
+      credential: {
+        type: "basic",
+        public_key: b64(new Uint8Array(32)),
+      },
+    });
     expect(relay.party("agent-1")).toBeUndefined();
     expect(relay.isCapable("agent-1")).toBe(false);
   });
@@ -138,27 +187,58 @@ describe("key directory", () => {
   it("refuses a client key that is not 32 bytes with a 422 envelope", () => {
     let error: unknown;
     try {
-      relay.enrollClient({ clientId: "c", publicKey: b64(new Uint8Array(16)) });
+      relay.enrollClient({
+        clientId: "c",
+        publicKey: b64(new Uint8Array(16)),
+      });
     }
     catch (err) {
       error = err;
     }
     expect(error).toBeInstanceOf(RelayValidationError);
     expect((error as RelayValidationError).statusCode).toBe(422);
-    expect((error as RelayValidationError).toJSON().error).toMatchObject({ code: "VALIDATION_ERROR", details: { fieldErrors: { public_key: expect.any(Array) } } });
+    expect((error as RelayValidationError).toJSON().error).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: {
+        fieldErrors: {
+          public_key: expect.any(Array),
+        },
+      },
+    });
   });
 
   it("stores valid KeyPackages, rejects the rest per index and answers an agent upload with its outbox id", () => {
     const { identity, store } = runner("agent-1", 0);
-    relay.acceptAgentKeyPackages("agent-1", { one_time: [b64(store.generate(identity)), "AAAA"], last_resort: b64(store.generate(identity, true)) }, "out-1");
-    expect(agents.sent).toEqual([{
-      agentId: "agent-1",
-      frame: { type: "e2ee_key_package_status", id: "out-1", data: { one_time: 1, last_resort: true, rejected: [{ code: "malformed", index: 1 }] } },
-    }]);
+    relay.acceptAgentKeyPackages("agent-1", {
+      one_time: [
+        b64(store.generate(identity)),
+        "AAAA",
+      ],
+      last_resort: b64(store.generate(identity, true)),
+    }, "out-1");
+    expect(agents.sent).toEqual([
+      {
+        agentId: "agent-1",
+        frame: {
+          type: "e2ee_key_package_status",
+          id: "out-1",
+          data: {
+            one_time: 1,
+            last_resort: true,
+            rejected: [
+              { code: "malformed", index: 1 },
+            ],
+          },
+        },
+      },
+    ]);
 
     const claimed = relay.claimKeyPackage("agent-1");
     expect(claimed.last_resort).toBe(false);
-    expect(agents.sent.at(-1)!.frame).toEqual({ type: "e2ee_key_package_status", data: { one_time: 0, last_resort: true } });
+    expect(agents.sent.at(-1)!.frame).toEqual({
+      type: "e2ee_key_package_status",
+      data: { one_time: 0, last_resort: true },
+    });
     expect(relay.claimKeyPackage("agent-1").last_resort).toBe(true);
   });
 });
@@ -166,10 +246,23 @@ describe("key directory", () => {
 describe("delivery service", () => {
   it("registers a scope once, for an existing task only", () => {
     const creator = encryptedTask();
-    expect(relay.scope(creator.taskId)).toMatchObject({ epoch: 0, members: [{ leaf_index: 0, party_id: creator.partyId, kind: "client" }] });
-    expect(events).toContainEqual({ name: "e2ee.scope_registered", payload: { taskId: creator.taskId, creator: creator.partyId } });
+    expect(relay.scope(creator.taskId)).toMatchObject({
+      epoch: 0,
+      members: [
+        { leaf_index: 0, party_id: creator.partyId, kind: "client" },
+      ],
+    });
+    expect(events).toContainEqual({
+      name: "e2ee.scope_registered",
+      payload: { taskId: creator.taskId, creator: creator.partyId },
+    });
 
-    const input = { profile_id: E2EE_PROFILE_ID, group_id: b64(creator.group.groupId), drop_public_key: b64(creator.group.dropPublicKey()), creator: creator.partyId };
+    const input = {
+      profile_id: E2EE_PROFILE_ID,
+      group_id: b64(creator.group.groupId),
+      drop_public_key: b64(creator.group.dropPublicKey()),
+      creator: creator.partyId,
+    };
     expect(() => relay.registerScope("missing", input)).toThrow(RelayNotFoundError);
     let error: unknown;
     try {
@@ -186,17 +279,39 @@ describe("delivery service", () => {
   it("accepts a commit adding a runner, delivers the Welcome and the log, and acks the Welcome on msg_ack", () => {
     runner("agent-1");
     const creator = encryptedTask();
-    const unit = creator.group.addMembers(creator.identity, [decodeB64url(relay.claimKeyPackage("agent-1").key_package)]);
+    const unit = creator.group.addMembers(creator.identity, [
+      decodeB64url(relay.claimKeyPackage("agent-1").key_package),
+    ]);
     const accepted = relay.submitCommit(creator.taskId, submission(creator.partyId, unit));
     creator.group.commitAccepted(accepted.seq);
     expect(accepted).toEqual({ seq: 1, epoch: 1 });
     expect(relay.isMember(creator.taskId, "agent-1")).toBe(true);
-    expect(events.at(-1)).toEqual({ name: "e2ee.commit", payload: { taskId: creator.taskId, seq: 1, epoch: 1, submitter: creator.partyId, added: ["agent-1"], removed: [] } });
+    expect(events.at(-1)).toEqual({
+      name: "e2ee.commit",
+      payload: {
+        taskId: creator.taskId,
+        seq: 1,
+        epoch: 1,
+        submitter: creator.partyId,
+        added: ["agent-1"],
+        removed: [],
+      },
+    });
 
     const welcome = agents.queued.find(q => q.frame.type === "e2ee_welcome")!;
-    expect(welcome).toMatchObject({ agentId: "agent-1", frame: { taskId: creator.taskId, data: { seq: 1 } } });
+    expect(welcome).toMatchObject({
+      agentId: "agent-1",
+      frame: {
+        taskId: creator.taskId,
+        data: { seq: 1 },
+      },
+    });
     expect(relay.welcomes("agent-1")).toHaveLength(1);
-    relay.onMessageAck("agent-1", { type: "e2ee_log", taskId: creator.taskId, data: { seq: 1 } });
+    relay.onMessageAck("agent-1", {
+      type: "e2ee_log",
+      taskId: creator.taskId,
+      data: { seq: 1 },
+    });
     expect(relay.welcomes("agent-1")).toHaveLength(1);
     relay.onMessageAck("agent-1", welcome.frame);
     expect(relay.welcomes("agent-1")).toEqual([]);
@@ -211,27 +326,65 @@ describe("delivery service", () => {
   it("answers runner requests and maps rejections into the response", () => {
     runner("agent-1");
     const creator = encryptedTask();
-    const unit = creator.group.addMembers(creator.identity, [decodeB64url(relay.claimKeyPackage("agent-1").key_package)]);
+    const unit = creator.group.addMembers(creator.identity, [
+      decodeB64url(relay.claimKeyPackage("agent-1").key_package),
+    ]);
     creator.group.commitAccepted(relay.submitCommit(creator.taskId, submission(creator.partyId, unit)).seq);
 
-    expect(request("agent-1", creator.taskId, { op: "log", after_seq: 0 })).toMatchObject({ ok: true, epoch: 1, more: false, entries: [{ seq: 1, kind: "commit", epoch: 0 }] });
+    expect(request("agent-1", creator.taskId, { op: "log", after_seq: 0 })).toMatchObject({
+      ok: true,
+      epoch: 1,
+      more: false,
+      entries: [
+        { seq: 1, kind: "commit", epoch: 0 },
+      ],
+    });
     expect(request("agent-1", creator.taskId, { op: "link", epoch: 1 })).toMatchObject({ ok: true, epoch: 1 });
-    expect(request("agent-1", creator.taskId, { op: "nope" })).toEqual({ ok: false, error: { code: "malformed", message: "invalid e2ee_request" }, epoch: 1 });
-    expect(request("agent-1", "unknown", { op: "log", after_seq: 0 })).toEqual({ ok: false, error: { code: "not_member", message: "unknown scope" } });
-    expect(request("stranger", creator.taskId, { op: "log", after_seq: 0 })).toMatchObject({ ok: false, error: { code: "not_member" }, epoch: 1 });
+    expect(request("agent-1", creator.taskId, { op: "nope" })).toEqual({
+      ok: false,
+      error: { code: "malformed", message: "invalid e2ee_request" },
+      epoch: 1,
+    });
+    expect(request("agent-1", "unknown", { op: "log", after_seq: 0 })).toEqual({
+      ok: false,
+      error: { code: "not_member", message: "unknown scope" },
+    });
+    expect(request("stranger", creator.taskId, { op: "log", after_seq: 0 })).toMatchObject({
+      ok: false,
+      error: { code: "not_member" },
+      epoch: 1,
+    });
 
     // A stale commit (epoch 0) is answered with the current epoch.
-    expect(request("agent-1", creator.taskId, { op: "commit", commit: b64(unit.commit), drop_public_key: b64(unit.dropPublicKey) }))
-      .toMatchObject({ ok: false, error: { code: "epoch_conflict" }, epoch: 1 });
+    expect(request("agent-1", creator.taskId, {
+      op: "commit",
+      commit: b64(unit.commit),
+      drop_public_key: b64(unit.dropPublicKey),
+    }))
+      .toMatchObject({
+        ok: false,
+        error: { code: "epoch_conflict" },
+        epoch: 1,
+      });
 
     const before = agents.sent.length;
-    relay.handleAgentRequest("agent-1", { taskId: creator.taskId, data: { op: "log", after_seq: 0 } });
+    relay.handleAgentRequest("agent-1", {
+      taskId: creator.taskId,
+      data: { op: "log", after_seq: 0 },
+    });
     expect(agents.sent).toHaveLength(before);
   });
 
   it("renders a DS rejection's epoch as the envelope details", () => {
     const error = new E2eeDsError("epoch_conflict", "stale", 3);
-    expect(error.toJSON()).toEqual({ success: false, error: { code: "epoch_conflict", message: "stale", details: { epoch: 3 } } });
+    expect(error.toJSON()).toEqual({
+      success: false,
+      error: {
+        code: "epoch_conflict",
+        message: "stale",
+        details: { epoch: 3 },
+      },
+    });
     expect(new E2eeDsError("link_exists", "taken", undefined, "AA").toJSON().error.details).toEqual({ link: "AA" });
     expect(new E2eeDsError("malformed", "bad").toJSON().error).toEqual({ code: "malformed", message: "bad" });
   });

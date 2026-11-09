@@ -39,7 +39,9 @@ export class E2eeError extends Error {
     super(
       detail.epoch !== undefined
         ? `${detail.code} (epoch ${detail.epoch})`
-        : detail.reason !== undefined ? `${detail.code}: ${detail.reason}` : detail.code,
+        : detail.reason !== undefined
+          ? `${detail.code}: ${detail.reason}`
+          : detail.code,
     );
     this.name = "E2eeError";
     this.code = detail.code;
@@ -51,7 +53,9 @@ export class E2eeError extends Error {
 
   /** The `encryption_error` object of a §11 failure. */
   toJSON(): { code: E2eeErrorCode; epoch?: number } {
-    return this.epoch === undefined ? { code: this.code } : { code: this.code, epoch: this.epoch };
+    return this.epoch === undefined
+      ? { code: this.code }
+      : { code: this.code, epoch: this.epoch };
   }
 }
 
@@ -60,7 +64,9 @@ function toE2eeError(error: unknown): unknown {
     return error;
   try {
     const detail = JSON.parse(error.message) as ErrorDetail;
-    return typeof detail.code === "string" ? new E2eeError(detail) : error;
+    return typeof detail.code === "string"
+      ? new E2eeError(detail)
+      : error;
   }
   catch {
     return error;

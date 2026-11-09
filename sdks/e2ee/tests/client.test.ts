@@ -38,7 +38,10 @@ class Runner {
 
   constructor(readonly host: FakeHost, readonly agentId = AGENT) {
     host.registerAgent(agentId, this.identity.publicKey);
-    host.publish(agentId, [this.store.generate(this.identity), this.store.generate(this.identity)], this.store.generate(this.identity, true));
+    host.publish(agentId, [
+      this.store.generate(this.identity),
+      this.store.generate(this.identity),
+    ], this.store.generate(this.identity, true));
   }
 
   /** Joins from its Welcome and applies the rest of the log. */
@@ -59,7 +62,12 @@ class Runner {
 
   /** Seals a transcript event and stores it as the host's transcript row. */
   reply(taskId: string, threadId: string, seq: number, data: Record<string, unknown>): void {
-    const frame = { type: "thread_message", taskId, threadId, data: { seq, ...data } };
+    const frame = {
+      type: "thread_message",
+      taskId,
+      threadId,
+      data: { seq, ...data },
+    };
     const sealed = this.groups.get(taskId)!.sealFrame<{ data: Record<string, unknown> }>(engine, "thread_message", frame).data;
     this.thread(taskId, threadId).messages.push({
       seq,
@@ -76,9 +84,22 @@ class Runner {
   }
 
   result(taskId: string, threadId: string, outboxId: string, data: { result?: string; error?: string }): void {
-    const frame = { type: "thread_result", taskId, threadId, outboxId, data: { status: "succeeded", ...data } };
+    const frame = {
+      type: "thread_result",
+      taskId,
+      threadId,
+      outboxId,
+      data: { status: "succeeded", ...data },
+    };
     const sealed = this.groups.get(taskId)!.sealFrame<{ data: { result?: SealedValue; error?: SealedValue } }>(engine, "thread_result", frame).data;
-    this.thread(taskId, threadId).run = { status: "succeeded", outboxId, result: sealed.result ?? null, error: sealed.error ?? null, failureReason: null, encryptionError: null };
+    this.thread(taskId, threadId).run = {
+      status: "succeeded",
+      outboxId,
+      result: sealed.result ?? null,
+      error: sealed.error ?? null,
+      failureReason: null,
+      encryptionError: null,
+    };
   }
 
   thread(taskId: string, threadId: string) {
@@ -92,7 +113,12 @@ class Runner {
 function setup() {
   const host = new FakeHost();
   const snapshots: DeviceSnapshot[] = [];
-  const options = { baseUrl: `${BASE}/`, token: TOKEN, fetch: host.fetch, onSnapshot: (s: DeviceSnapshot) => void snapshots.push(s) };
+  const options = {
+    baseUrl: `${BASE}/`,
+    token: TOKEN,
+    fetch: host.fetch,
+    onSnapshot: (s: DeviceSnapshot) => void snapshots.push(s),
+  };
   const client = E2eeClient.create("laptop", options);
   return { host, client, snapshots, options };
 }
@@ -127,7 +153,14 @@ describe("enroll and create", () => {
     expect(party.fingerprint).toBe(client.fingerprint);
     expect(keyPackages).toEqual({ one_time: 3, last_resort: true });
     expect(host.calls.map(c => `${c.method} ${c.path}`)).toEqual(["POST /e2ee/clients", "POST /e2ee/parties/client%3Alaptop/key-packages"]);
-    expect(host.calls[0]!.body).toMatchObject({ client_id: "laptop", capability: { versions: [1], mls_suites: [1], credential: { type: "basic" } } });
+    expect(host.calls[0]!.body).toMatchObject({
+      client_id: "laptop",
+      capability: {
+        versions: [1],
+        mls_suites: [1],
+        credential: { type: "basic" },
+      },
+    });
     // The KeyPackage private keys were persisted before the upload.
     expect(snapshots).toHaveLength(1);
     expect(snapshots[0]!.identity).toEqual(client.identity.seed);
@@ -145,7 +178,12 @@ describe("enroll and create", () => {
     expect(host.calls.at(-1)!.body).toEqual({
       ...TASK,
       id: taskId,
-      e2ee: { profile_id: PROFILE, group_id: encodeB64url(groupId(PROFILE, taskId)), drop_public_key: encodeB64url(group.dropPublicKey()), creator: "client:laptop" },
+      e2ee: {
+        profile_id: PROFILE,
+        group_id: encodeB64url(groupId(PROFILE, taskId)),
+        drop_public_key: encodeB64url(group.dropPublicKey()),
+        creator: "client:laptop",
+      },
     });
     expect(task.e2ee?.epoch).toBe(0);
   });
@@ -164,7 +202,13 @@ describe("enroll and create", () => {
 describe("membership", () => {
   test("addRunner claims, commits with link and Welcome, assigns; the runner opens the prompt", async () => {
     const { host, client, taskId, runner, added } = await withRunner();
-    expect(added).toMatchObject({ seq: 1, epoch: 1, lastResort: false, party: { partyId: AGENT }, dispatch: { placed: true, agentId: AGENT } });
+    expect(added).toMatchObject({
+      seq: 1,
+      epoch: 1,
+      lastResort: false,
+      party: { partyId: AGENT },
+      dispatch: { placed: true, agentId: AGENT },
+    });
     const commit = host.calls.find(c => c.path.endsWith("/commits"))!.body as Record<string, unknown>;
     expect(commit.party_id).toBe("client:laptop");
     expect(typeof commit.welcome).toBe("string");
@@ -174,17 +218,33 @@ describe("membership", () => {
     expect(runner.groups.get(taskId)!.current()).toEqual(client.group(taskId)!.current());
 
     const sealed = client.sealPrompt(taskId, "summarize the repo");
-    const frame = { type: "message", taskId, data: { text: sealed } };
-    expect(runner.groups.get(taskId)!.openFrame<object>(engine, "message", frame)).toEqual({ ...frame, data: { text: "summarize the repo" } });
+    const frame = {
+      type: "message",
+      taskId,
+      data: { text: sealed },
+    };
+    expect(runner.groups.get(taskId)!.openFrame<object>(engine, "message", frame)).toEqual({
+      ...frame,
+      data: { text: "summarize the repo" },
+    });
 
     const cron = client.sealCronPrompt(taskId, "daily digest");
-    const cronFrame = { type: "cron_upsert", taskId, data: { prompt: cron } };
+    const cronFrame = {
+      type: "cron_upsert",
+      taskId,
+      data: { prompt: cron },
+    };
     expect(runner.groups.get(taskId)!.openFrame<{ data: { prompt: string } }>(engine, "cron_upsert", cronFrame).data.prompt).toBe("daily digest");
 
     await client.sendPrompt(taskId, "next", { newThread: true });
     const sent = host.calls.at(-1)!;
     expect(sent.path).toBe(`/tasks/${taskId}/message`);
-    expect(sent.body).toMatchObject({ new_thread: true, text: { e2ee: expect.any(String) } });
+    expect(sent.body).toMatchObject({
+      new_thread: true,
+      text: {
+        e2ee: expect.any(String),
+      },
+    });
   });
 
   test("addRunner without assign leaves the task unplaced", async () => {
@@ -225,7 +285,11 @@ describe("membership", () => {
       }
     };
     const error = await rejection(client.rotate(taskId));
-    expect([error.code, error.status, error.details]).toEqual(["epoch_conflict", 409, { epoch: 3 }]);
+    expect([error.code, error.status, error.details]).toEqual([
+      "epoch_conflict",
+      409,
+      { epoch: 3 },
+    ]);
     expect(client.group(taskId)!.hasPendingCommit).toBe(false);
   });
 
@@ -280,14 +344,23 @@ describe("membership", () => {
     const { taskId } = await client.createEncryptedTask(TASK);
     void new Runner(host);
     const realFetch = host.fetch;
-    const options = { baseUrl: BASE, token: TOKEN, fetch: async (input: string, init: RequestInit) => {
-      const response = await realFetch(input, init);
-      if (!input.endsWith("/claim"))
-        return response;
-      const json = await response.json() as { data: { party: Record<string, unknown> } };
-      json.data.party.key_change_warning = { pinned_fingerprint: "a", pending_fingerprint: "b", pending_fingerprint_display: "b", changed_at: 1 };
-      return Response.json(json);
-    } };
+    const options = {
+      baseUrl: BASE,
+      token: TOKEN,
+      fetch: async (input: string, init: RequestInit) => {
+        const response = await realFetch(input, init);
+        if (!input.endsWith("/claim"))
+          return response;
+        const json = await response.json() as { data: { party: Record<string, unknown> } };
+        json.data.party.key_change_warning = {
+          pinned_fingerprint: "a",
+          pending_fingerprint: "b",
+          pending_fingerprint_display: "b",
+          changed_at: 1,
+        };
+        return Response.json(json);
+      },
+    };
     const restored = E2eeClient.restore(client.snapshot(), options);
     const added = await restored.addMember(taskId, AGENT);
     expect(added.keyChangeWarning).toMatchObject({ pending_fingerprint: "b" });
@@ -322,9 +395,27 @@ describe("opening output", () => {
   test("transcript fields open one by one; a failure stays on its value", async () => {
     const { client, taskId, runner } = await withRunner();
     runner.reply(taskId, "th-1", 1, { kind: "assistant_text", content: "hello" });
-    runner.reply(taskId, "th-1", 2, { kind: "tool_use", tool: "Bash", input: { command: "ls" } });
-    runner.reply(taskId, "th-1", 3, { kind: "tool_result", output: { is_error: false, content: [{ type: "text", text: "a.txt" }] } });
-    runner.reply(taskId, "th-1", 4, { kind: "host_action", input: { method: "notify", params: { to: "ops" } } });
+    runner.reply(taskId, "th-1", 2, {
+      kind: "tool_use",
+      tool: "Bash",
+      input: { command: "ls" },
+    });
+    runner.reply(taskId, "th-1", 3, {
+      kind: "tool_result",
+      output: {
+        is_error: false,
+        content: [
+          { type: "text", text: "a.txt" },
+        ],
+      },
+    });
+    runner.reply(taskId, "th-1", 4, {
+      kind: "host_action",
+      input: {
+        method: "notify",
+        params: { to: "ops" },
+      },
+    });
     // A value moved to another seq no longer opens (its location binds the seq).
     const rows = runner.thread(taskId, "th-1").messages as Array<Record<string, unknown>>;
     rows.push({ ...rows[0]!, seq: 5 });
@@ -332,9 +423,26 @@ describe("opening output", () => {
     const opened = await client.openTranscript(taskId, "th-1");
     expect(opened.map(m => m.seq)).toEqual([1, 2, 3, 4, 5]);
     expect(opened[0]!.content).toEqual({ ok: true, value: "hello" });
-    expect(opened[1]!.input).toEqual({ ok: true, value: { command: "ls" } });
-    expect(opened[2]!.output).toEqual({ ok: true, value: { is_error: false, content: [{ type: "text", text: "a.txt" }] } });
-    expect(opened[3]!.input).toEqual({ ok: true, value: { method: "notify", params: { to: "ops" } } });
+    expect(opened[1]!.input).toEqual({
+      ok: true,
+      value: { command: "ls" },
+    });
+    expect(opened[2]!.output).toEqual({
+      ok: true,
+      value: {
+        is_error: false,
+        content: [
+          { type: "text", text: "a.txt" },
+        ],
+      },
+    });
+    expect(opened[3]!.input).toEqual({
+      ok: true,
+      value: {
+        method: "notify",
+        params: { to: "ops" },
+      },
+    });
     expect(opened[4]!.content!.ok).toBe(false);
     expect((opened[4]!.content as { error: E2eeError }).error.code).toBe("open_failed");
   });
@@ -380,9 +488,27 @@ describe("opening output", () => {
     expect(sealed.descriptor).toMatchObject({ content_type: "application/octet-stream", size: sealed.envelope.length });
     const group = runner.groups.get(taskId)!;
     expect(text.decode(group.open(sealed.envelope, `scope:${taskId}|field:file`))).toBe("attachment body");
-    const frame = { type: "message", taskId, data: { attachments: [{ name: sealed.descriptor.name, sha256: sealed.descriptor.sha256 }] } };
+    const frame = {
+      type: "message",
+      taskId,
+      data: {
+        attachments: [
+          { name: sealed.descriptor.name, sha256: sealed.descriptor.sha256 },
+        ],
+      },
+    };
     expect(group.openFrame<{ data: { attachments: Array<{ name: string }> } }>(engine, "message", frame).data.attachments[0]!.name).toBe("notes.md");
-    const swapped = { ...frame, data: { attachments: [{ name: sealed.descriptor.name, sha256: "0".repeat(64) }] } };
+    const swapped = {
+      ...frame,
+      data: {
+        attachments: [
+          {
+            name: sealed.descriptor.name,
+            sha256: "0".repeat(64),
+          },
+        ],
+      },
+    };
     expect(() => group.openFrame(engine, "message", swapped)).toThrow(E2eeError);
   });
 
@@ -391,9 +517,25 @@ describe("opening output", () => {
     const group = runner.groups.get(taskId)!;
     const { epoch, k } = group.current();
     const file = sealFile(k, epoch, `scope:${taskId}|field:file`, new TextEncoder().encode("report body"));
-    const frame = { type: "thread_result", taskId, threadId: "th-1", outboxId: "01k8zz0000000000000000r003", data: { status: "succeeded", attachments: [{ name: "report.txt", sha256: file.sha256 }] } };
+    const frame = {
+      type: "thread_result",
+      taskId,
+      threadId: "th-1",
+      outboxId: "01k8zz0000000000000000r003",
+      data: {
+        status: "succeeded",
+        attachments: [
+          { name: "report.txt", sha256: file.sha256 },
+        ],
+      },
+    };
     const name = group.sealFrame<{ data: { attachments: Array<{ name: SealedValue }> } }>(engine, "thread_result", frame).data.attachments[0]!.name;
-    const descriptor = { taskId, threadId: "th-1", name, sha256: file.sha256 };
+    const descriptor = {
+      taskId,
+      threadId: "th-1",
+      name,
+      sha256: file.sha256,
+    };
 
     const opened = await client.openOutputFile(descriptor, file.envelope);
     expect(opened.name).toEqual({ ok: true, value: "report.txt" });
@@ -413,7 +555,14 @@ describe("opening output", () => {
     expect(host.calls.at(-1)).toMatchObject({ method: "POST", path: `/tasks/${taskId}/attachments`, body: sealed.envelope });
 
     const listed = await client.listAttachments(taskId, "th-1");
-    expect(listed).toMatchObject([{ id: "att-1", taskId, sha256: sealed.descriptor.sha256, size: sealed.envelope.length }]);
+    expect(listed).toMatchObject([
+      {
+        id: "att-1",
+        taskId,
+        sha256: sealed.descriptor.sha256,
+        size: sealed.envelope.length,
+      },
+    ]);
     expect(await client.listAttachments(taskId, "th-other")).toEqual([]);
     const bytes = await client.downloadAttachment(taskId, "att-1");
     expect(bytes).toEqual(sealed.envelope);
@@ -423,9 +572,31 @@ describe("opening output", () => {
     const group = runner.groups.get(taskId)!;
     const { epoch, k } = group.current();
     const file = sealFile(k, epoch, `scope:${taskId}|field:file`, new TextEncoder().encode("report body"));
-    const frame = { type: "thread_result", taskId, threadId: "th-1", data: { attachments: [{ name: "report.txt", sha256: file.sha256 }] } };
+    const frame = {
+      type: "thread_result",
+      taskId,
+      threadId: "th-1",
+      data: {
+        attachments: [
+          { name: "report.txt", sha256: file.sha256 },
+        ],
+      },
+    };
     const name = group.sealFrame<{ data: { attachments: Array<{ name: SealedValue }> } }>(engine, "thread_result", frame).data.attachments[0]!.name;
-    host.attachments.push({ row: { id: "att-out", taskId, threadId: "th-1", name, contentType: "application/octet-stream", size: file.size, sha256: file.sha256, direction: "outbound", createdAt: 0 }, bytes: file.envelope });
+    host.attachments.push({
+      row: {
+        id: "att-out",
+        taskId,
+        threadId: "th-1",
+        name,
+        contentType: "application/octet-stream",
+        size: file.size,
+        sha256: file.sha256,
+        direction: "outbound",
+        createdAt: 0,
+      },
+      bytes: file.envelope,
+    });
     const output = (await client.listAttachments(taskId)).find(a => a.direction === "outbound")!;
     const opened = await client.openOutputFile(output, await client.downloadAttachment(taskId, output.id));
     expect(opened.name).toEqual({ ok: true, value: "report.txt" });

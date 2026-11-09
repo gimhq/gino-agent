@@ -77,7 +77,9 @@ function frameSteps(where: string, path: string, allowArrays: boolean): Step[] {
   const steps: Step[] = [];
   for (const segment of path.split(".")) {
     const isArray = segment.endsWith("[]");
-    const key = isArray ? segment.slice(0, -2) : segment;
+    const key = isArray
+      ? segment.slice(0, -2)
+      : segment;
     if (!KEY.test(key))
       fail(where, `invalid path \`${path}\``);
     if (isArray && !allowArrays)
@@ -172,10 +174,14 @@ function parseTemplate(where: string, aad: string): Template {
       fail(where, `invalid AAD name \`${name}\``);
     if (value === "")
       fail(where, `empty AAD value for \`${name}\``);
-    const placeholder = value.startsWith("{") && value.endsWith("}") ? value.slice(1, -1) : undefined;
+    const placeholder = value.startsWith("{") && value.endsWith("}")
+      ? value.slice(1, -1)
+      : undefined;
     if (placeholder === undefined && /[{}]/.test(value))
       fail(where, `a placeholder must be a whole value (\`${value}\`)`);
-    return placeholder === undefined ? { name, value } : { name, value, placeholder };
+    return placeholder === undefined
+      ? { name, value }
+      : { name, value, placeholder };
   });
   return { parts };
 }
@@ -248,7 +254,10 @@ function checkFrame(where: string, frame: FrameRule): void {
   };
   for (const [i, a] of sealing.entries()) {
     for (const b of sealing.slice(i + 1)) {
-      const [sa, sb] = [frameSteps(where, a.path, true), frameSteps(where, b.path, true)];
+      const [sa, sb] = [
+        frameSteps(where, a.path, true),
+        frameSteps(where, b.path, true),
+      ];
       if (canCoApply(a, b) && (isPrefix(sa, sb) || isPrefix(sb, sa)))
         fail(where, `rules \`${a.path}\` and \`${b.path}\` overlap`);
     }
@@ -296,7 +305,12 @@ function parseMap(file: string, text: string): FieldMap {
     if (!Array.isArray(value.fields))
       fail(where, "`fields` must be an array");
     const fields = value.fields.map((rule, i) => parseRule(`${where}.fields[${i}]`, rule, scope));
-    const frame: FrameRule = { frameType, direction: value.direction as Direction, scope, fields };
+    const frame: FrameRule = {
+      frameType,
+      direction: value.direction as Direction,
+      scope,
+      fields,
+    };
     checkFrame(where, frame);
     return frame;
   });
@@ -326,7 +340,9 @@ function rsStr(value: string): string {
     if (c === "\\" || c === "\"")
       return `\\${c}`;
     const code = c.codePointAt(0) ?? 0;
-    return code < 0x20 || code === 0x7F ? `\\u{${code.toString(16)}}` : c;
+    return code < 0x20 || code === 0x7F
+      ? `\\u{${code.toString(16)}}`
+      : c;
   });
   return `"${escaped.join("")}"`;
 }
@@ -340,7 +356,9 @@ function rsRule(rule: FieldRule, pad: string): string {
     `${pad}    aad: ${rsStr(rule.aad)},`,
   ];
   if (rule.when) {
-    const op = rule.when.op === "eq" ? "Eq" : "Ne";
+    const op = rule.when.op === "eq"
+      ? "Eq"
+      : "Ne";
     lines.push(`${pad}    when: Some(When { path: ${rsStr(rule.when.path)}, op: WhenOp::${op}, value: ${rsStr(rule.when.value)} }),`);
   }
   else {
@@ -533,7 +551,16 @@ function main(): number {
   }
 
   let stale = 0;
-  for (const [path, content] of [[RUST_OUT, renderRust(maps)], [TS_OUT, renderTs(maps)]] as const) {
+  for (const [path, content] of [
+    [
+      RUST_OUT,
+      renderRust(maps),
+    ],
+    [
+      TS_OUT,
+      renderTs(maps),
+    ],
+  ] as const) {
     const name = relative(ROOT, path);
     if (check) {
       if (!existsSync(path) || readFileSync(path, "utf8") !== content) {
@@ -547,7 +574,9 @@ function main(): number {
       console.log(`wrote ${name}`);
     }
   }
-  return stale === 0 ? 0 : 1;
+  return stale === 0
+    ? 0
+    : 1;
 }
 
 process.exit(main());

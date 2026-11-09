@@ -11,7 +11,10 @@ export default antfu({
   rules: {
     "no-console": "warn",
     "ts/no-explicit-any": "error",
-    "ts/consistent-type-imports": ["error", { prefer: "type-imports" }],
+    "ts/consistent-type-imports": [
+      "error",
+      { prefer: "type-imports" },
+    ],
   },
   ignores: [
     "**/*.json",

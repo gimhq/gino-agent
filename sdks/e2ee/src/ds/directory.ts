@@ -136,7 +136,9 @@ function validCapability(raw: unknown): ValidCapability | null {
     return null;
   }
   const publicKey = Uint8Array.from(atob(credential.public_key.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0));
-  return publicKey.length === 32 ? { capability: parsed.data, publicKey } : null;
+  return publicKey.length === 32
+    ? { capability: parsed.data, publicKey }
+    : null;
 }
 
 /** `E2eeDirectory.isCapable` over the storage alone. */
@@ -192,7 +194,9 @@ export class E2eeDirectory {
     this.ready();
     try {
       const bytes = decodeB64url(text);
-      return bytes.length === 32 ? bytes : null;
+      return bytes.length === 32
+        ? bytes
+        : null;
     }
     catch {
       return null;
@@ -213,7 +217,9 @@ export class E2eeDirectory {
       partyId: row.partyId,
       fingerprint: row.fingerprint,
       fingerprint_display: fingerprintDisplay(row.publicKey),
-      ...(warning ? { key_change_warning: warning } : {}),
+      ...(warning
+        ? { key_change_warning: warning }
+        : {}),
     };
   }
 
@@ -250,7 +256,14 @@ export class E2eeDirectory {
     const fp = fingerprint(publicKey);
     const existing = this.repo.getParty(partyId);
     if (!existing) {
-      const row = this.repo.pinPartyIfAbsent({ partyId, kind, publicKey, fingerprint: fp, capability, pinnedAt: now });
+      const row = this.repo.pinPartyIfAbsent({
+        partyId,
+        kind,
+        publicKey,
+        fingerprint: fp,
+        capability,
+        pinnedAt: now,
+      });
       this.deps.logger.info({ partyId, kind, fingerprint: row.fingerprint }, "e2ee identity key pinned");
       return row;
     }
@@ -260,10 +273,20 @@ export class E2eeDirectory {
     if (existing.fingerprint !== fp && existing.pendingFingerprint !== fp) {
       this.repo.recordKeyChange(partyId, publicKey, fp, now);
       this.deps.logger.warn(
-        { partyId, kind: existing.kind, fingerprint: existing.fingerprint, pendingFingerprint: fp },
+        {
+          partyId,
+          kind: existing.kind,
+          fingerprint: existing.fingerprint,
+          pendingFingerprint: fp,
+        },
         "e2ee identity key changed — the new key is pending an operator re-pin",
       );
-      this.deps.emit("e2ee.key_changed", { partyId, kind: existing.kind, fingerprint: existing.fingerprint, pendingFingerprint: fp });
+      this.deps.emit("e2ee.key_changed", {
+        partyId,
+        kind: existing.kind,
+        fingerprint: existing.fingerprint,
+        pendingFingerprint: fp,
+      });
     }
     return this.requireParty(partyId);
   }
@@ -303,7 +326,9 @@ export class E2eeDirectory {
   /** One party, or `undefined`. */
   party(partyId: string): E2eePartyView | undefined {
     const row = this.repo.getParty(partyId);
-    return row ? this.view(row) : undefined;
+    return row
+      ? this.view(row)
+      : undefined;
   }
 
   /**
@@ -316,16 +341,28 @@ export class E2eeDirectory {
   enrollClient(input: E2eeClientEnrollment): E2eePartyView {
     const publicKey = this.decodeKey(input.publicKey);
     if (!publicKey) {
-      throw new RelayValidationError("Validation failed", { fieldErrors: { public_key: ["must be base64url of a 32-byte Ed25519 key"] } });
+      throw new RelayValidationError("Validation failed", {
+        fieldErrors: {
+          public_key: ["must be base64url of a 32-byte Ed25519 key"],
+        },
+      });
     }
     let capability: Record<string, unknown> | null = null;
     if (input.capability !== undefined) {
       const valid = validCapability(input.capability);
       if (!valid) {
-        throw new RelayValidationError("Validation failed", { fieldErrors: { capability: ["not a valid e2ee capability"] } });
+        throw new RelayValidationError("Validation failed", {
+          fieldErrors: {
+            capability: ["not a valid e2ee capability"],
+          },
+        });
       }
       if (!sameBytes(valid.publicKey, publicKey)) {
-        throw new RelayValidationError("Validation failed", { fieldErrors: { capability: ["credential.public_key does not match public_key"] } });
+        throw new RelayValidationError("Validation failed", {
+          fieldErrors: {
+            capability: ["credential.public_key does not match public_key"],
+          },
+        });
       }
       capability = valid.capability;
     }
@@ -382,7 +419,13 @@ export class E2eeDirectory {
     if (info.lastResort !== lastResort) {
       return "malformed";
     }
-    const row = { ref: toHex(info.ref), partyId: party.partyId, bytes, notAfter: info.notAfter, createdAt: now };
+    const row = {
+      ref: toHex(info.ref),
+      partyId: party.partyId,
+      bytes,
+      notAfter: info.notAfter,
+      createdAt: now,
+    };
     if (lastResort) {
       this.repo.putLastResortKeyPackage(row);
     }
@@ -412,7 +455,12 @@ export class E2eeDirectory {
     if (rejected.length > 0) {
       this.deps.logger.warn({ partyId, rejected }, "e2ee KeyPackages rejected");
     }
-    return { ...this.status(partyId), ...(rejected.length > 0 ? { rejected } : {}) };
+    return {
+      ...this.status(partyId),
+      ...(rejected.length > 0
+        ? { rejected }
+        : {}),
+    };
   }
 
   /**
@@ -437,7 +485,13 @@ export class E2eeDirectory {
    */
   acceptAgentKeyPackages(agentId: string, data: E2eeKeyPackagesData, outboxId?: string): void {
     const status = this.store(agentId, data);
-    this.deps.agents.send(agentId, { type: "e2ee_key_package_status", ...(outboxId != null ? { id: outboxId } : {}), data: status });
+    this.deps.agents.send(agentId, {
+      type: "e2ee_key_package_status",
+      ...(outboxId != null
+        ? { id: outboxId }
+        : {}),
+      data: status,
+    });
   }
 
   /**
@@ -449,7 +503,10 @@ export class E2eeDirectory {
     if (!this.deps.agents.isOnline(agentId) || !this.repo.getParty(agentId)) {
       return;
     }
-    this.deps.agents.send(agentId, { type: "e2ee_key_package_status", data: this.status(agentId) });
+    this.deps.agents.send(agentId, {
+      type: "e2ee_key_package_status",
+      data: this.status(agentId),
+    });
   }
 
   /**
@@ -474,6 +531,10 @@ export class E2eeDirectory {
       this.pushStatus(partyId);
     }
     this.ready();
-    return { key_package: encodeB64url(claimed.bytes), last_resort: claimed.lastResort, party: this.summary(party) };
+    return {
+      key_package: encodeB64url(claimed.bytes),
+      last_resort: claimed.lastResort,
+      party: this.summary(party),
+    };
   }
 }
