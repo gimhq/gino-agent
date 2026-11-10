@@ -17,7 +17,8 @@
 #            tool-use id (the SUB-AGENT talking)
 #        3c. a `user` `tool_result` block closing the same tool-use id, back on
 #            the main agent (top-level `parent_tool_use_id` null)
-#   4. a terminal `result`/success line    → runner Result → host thread_result(succeeded)
+#   4. a terminal `result`/success line with `usage` → runner Result → host
+#      thread_result(succeeded) carrying the usage
 #
 # It additionally drains stdin to recover the user prompt the runner streams in
 # (control_request `initialize`, `set_permission_mode`, then a `user` turn) and
@@ -34,9 +35,22 @@ set -u
 settings="{}"
 prev=""
 for arg in "$@"; do
-  [ "$prev" = "--settings" ] && settings="$arg"
+  case "$prev" in
+    --settings) settings="$arg" ;;
+    --fallback-model) [ -n "$arg" ] || { echo "error: --fallback-model needs a model" >&2; exit 2; } ;;
+    --max-turns)
+      case "$arg" in ''|*[!0-9]*) echo "error: --max-turns needs a number" >&2; exit 2 ;; esac
+      ;;
+    --mcp-config)
+      printf '%s' "$arg" | jq -e '.mcpServers | type == "object"' >/dev/null 2>&1 \
+        || { echo "error: --mcp-config is not an MCP config" >&2; exit 2; }
+      ;;
+  esac
   prev="$arg"
 done
+case "$prev" in
+  --fallback-model|--max-turns|--mcp-config) echo "error: $prev needs a value" >&2; exit 2 ;;
+esac
 automem="$(printf '%s' "$settings" | jq -r --arg off "${CLAUDE_CODE_DISABLE_AUTO_MEMORY:-}" '
   if (.autoMemoryDirectory // "" | endswith("/claude")) then "dir"
   elif .autoMemoryEnabled == false and $off == "1" then "off"
@@ -97,4 +111,5 @@ emit "$(jq -cn --arg id "$TASK_ID" \
 
 # 5) Terminal success result — carries the session id (the resume handle).
 emit "$(jq -cn --arg s "$SID" --arg r "$reply" \
-  '{type:"result",subtype:"success",is_error:false,result:$r,session_id:$s}')"
+  '{type:"result",subtype:"success",is_error:false,result:$r,session_id:$s,
+    usage:{input_tokens:12,output_tokens:5,cache_read_input_tokens:3},total_cost_usd:0.001}')"

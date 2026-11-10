@@ -15,7 +15,7 @@
 #   4. `item.started` `command_execution`  → runner ToolUse → host `tool_use`
 #   5. `item.completed` for the SAME id    → runner ToolResult → host `tool_result`
 #   6. `item.completed` `agent_message`    → runner Output → host `assistant_text`
-#   7. `turn.completed`                    → runner Result → host thread_result(succeeded)
+#   7. `turn.completed` with `usage`       → runner Result → host thread_result(succeeded)
 #
 # Every item carries `item_type` — that is the field the mapper reads first to
 # classify an item — and the tool call's id is fixed so the e2e can pin it.
@@ -52,7 +52,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --json|--skip-git-repo-check|--dangerously-bypass-approvals-and-sandbox) ;;
-    --model|--sandbox|-C|--cd) shift ;;
+    --model|--sandbox|-C|--cd|-c|--config) shift ;;
     -*)
       echo "error: unexpected argument '$1' found" >&2
       exit 2
@@ -107,4 +107,4 @@ emit "$(jq -cn --arg t "$reply" '{type:"item.completed",item:{
   id:"item_e2e_msg_1",item_type:"agent_message",text:$t}}')"
 
 # 7) Terminal success — the mapper folds in the remembered thread id + last message.
-emit '{"type":"turn.completed"}'
+emit '{"type":"turn.completed","usage":{"input_tokens":20,"cached_input_tokens":8,"output_tokens":4}}'
