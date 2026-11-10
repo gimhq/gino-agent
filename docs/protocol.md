@@ -179,7 +179,8 @@ level; `data` carries the type-specific business payload only.**
 ## 5. Frame catalog
 
 `data` casing: business fields are snake_case (`engine_session_id`, `duration_ms`,
-`final_seq`, `round_count`, `schedule_type`, …) except `heartbeat.activeThreads`. Envelope
+`final_seq`, `round_count`, `schedule_type`, …) except `heartbeat.activeThreads` and the keys
+inside `thread_result.usage`. Envelope
 ids are camelCase (`taskId`, `threadId`, `cronId`, `outboxId`, `msgId`). An attachment
 descriptor is `{id, name, content_type, size, sha256, ref, direction?}` (§9 of
 agent-architecture); bytes never travel in frames.
@@ -188,7 +189,7 @@ agent-architecture); bytes never travel in frames.
 
 | type | envelope ids | data | meaning |
 |---|---|---|---|
-| `thread_result` | `taskId`, `threadId` | `{status, result?, error?, failure_reason?, engine_session_id?, duration_ms, final_seq, attachments?, encryption_error?}` | terminal outcome of one execution (mirror → `thread_runs`) |
+| `thread_result` | `taskId`, `threadId` | `{status, result?, error?, failure_reason?, engine_session_id?, duration_ms, final_seq, attachments?, encryption_error?, engine?, model?, usage?}` | terminal outcome of one execution (mirror → `thread_runs`) |
 | `thread_message` | `taskId`, `threadId` | `{seq, kind, role?, content?, tool?, input?, output?, tool_use_id?, parent_tool_use_id?}` | one ordered transcript event (mirror → `messages`) |
 | `cron_state` | `taskId`, `cronId` | `{kind, schedule_type?, schedule_value?, continuity?, next_run?, status?, round_count, skipped_count, last_status?}` | local scheduling-ledger summary (mirror → `crons`) |
 | `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, configVersion?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engine binaries the agent starts, `{name, version?, path}` each, probed in the background at startup (heartbeats before the probe finishes omit it); `configVersion` is the last config `version` the agent applied (§3), omitted until one arrives |
@@ -235,6 +236,15 @@ Field semantics:
   NULL on success. `agent.encryption` (non-retryable) is an end-to-end encryption failure
   and comes with `encryption_error` (§5.3). A resume-unsafe failure (e.g. `agent.invalid_request`) omits
   `engine_session_id` so the next turn starts fresh.
+- `engine`, `model`, `usage` (`thread_result`, optional, additive) describe what actually ran.
+  `engine` is the backend name (`claude` | `codex`); `model` is the model the engine reported
+  (claude's `system/init`), else the task's `model`, else the agent's configured default for that
+  backend; both are absent when the thread failed before an engine was selected. `usage` is
+  present only when the engine reported it:
+  `{"inputTokens": n, "outputTokens": n, "cacheReadTokens"?: n, "costUsd"?: x}` — claude: the
+  final `result` event's `usage.{input_tokens, output_tokens, cache_read_input_tokens}` and
+  `total_cost_usd`; codex: `turn.completed.usage.{input_tokens, output_tokens,
+  cached_input_tokens}`, no cost. The keys inside `usage` are camelCase.
 - `seq` (`thread_message`) is per-thread monotonic (assigned serially by the runner);
   `final_seq` (`thread_result`) is the last `seq` emitted on the thread (see §6).
 - `tool_use_id` (`thread_message`) is the engine's id for a `tool_use` block, echoed on

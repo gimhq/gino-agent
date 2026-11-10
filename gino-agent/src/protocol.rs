@@ -523,6 +523,28 @@ pub(crate) mod frames {
         /// The end-to-end encryption failure behind `agent.encryption`.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) encryption_error: Option<EncryptionError>,
+        /// The backend the run used.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) engine: Option<String>,
+        /// The model the run used: the one the engine reported, else the
+        /// per-task model, else the runner's configured default.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) model: Option<String>,
+        /// Token usage and cost, when the engine reported them.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) usage: Option<RunUsageData>,
+    }
+
+    /// `thread_result.usage`: token counts and cost as the engine reported them.
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct RunUsageData {
+        pub(crate) input_tokens: u64,
+        pub(crate) output_tokens: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) cache_read_tokens: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) cost_usd: Option<f64>,
     }
 
     /// `data` of a `thread_message` — one ordered transcript event. `seq` is
@@ -1203,6 +1225,9 @@ pub(crate) mod frames {
                     final_seq: 9,
                     attachments: Some(vec![sample_attachment()]),
                     encryption_error: None,
+                    engine: None,
+                    model: None,
+                    usage: None,
                 },
                 outbox_id: Some(did(1)),
             };
@@ -1237,6 +1262,9 @@ pub(crate) mod frames {
                     final_seq: 2,
                     attachments: None,
                     encryption_error: None,
+                    engine: None,
+                    model: None,
+                    usage: None,
                 },
                 outbox_id: None,
             };
@@ -1382,6 +1410,9 @@ pub(crate) mod frames {
                     epoch: Some(4),
                     message: None,
                 }),
+                engine: None,
+                model: None,
+                usage: None,
             };
             let value = serde_json::to_value(&data).unwrap();
             assert_eq!(
@@ -1394,6 +1425,29 @@ pub(crate) mod frames {
             let future: EncryptionError =
                 serde_json::from_value(json!({ "code": "future_code", "x": 1 })).unwrap();
             assert_eq!(future.code, "future_code");
+        }
+
+        #[test]
+        fn thread_result_carries_the_run_telemetry() {
+            let data: ThreadResultData = serde_json::from_value(json!({
+                "status": "succeeded", "duration_ms": 1, "final_seq": 2,
+                "engine": "claude", "model": "claude-opus-4-8",
+                "usage": { "inputTokens": 10, "outputTokens": 5, "cacheReadTokens": 3, "costUsd": 0.25 }
+            }))
+            .unwrap();
+            let usage = data.usage.clone().unwrap();
+            assert_eq!((usage.input_tokens, usage.cost_usd), (10, Some(0.25)));
+            assert_eq!(
+                serde_json::to_value(&data).unwrap()["usage"],
+                json!({ "inputTokens": 10, "outputTokens": 5, "cacheReadTokens": 3, "costUsd": 0.25 })
+            );
+            let bare = ThreadResultData {
+                usage: None,
+                ..data
+            };
+            let value = serde_json::to_value(&bare).unwrap();
+            assert!(value.get("usage").is_none());
+            assert_eq!(value["engine"], "claude");
         }
 
         #[test]

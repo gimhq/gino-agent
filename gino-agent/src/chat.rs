@@ -689,6 +689,8 @@ mod tests {
                     session_id: Some("sess".to_owned()),
                     error: None,
                     error_kind: None,
+                    model: None,
+                    usage: None,
                 })]))
             }
         }

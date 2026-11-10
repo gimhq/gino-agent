@@ -24,7 +24,7 @@
 
 use serde_json::{Value, json};
 
-use crate::engine::{EngineEvent, LogLevel, RunErrorKind, RunOutcome, RunStatus};
+use crate::engine::{EngineEvent, LogLevel, RunErrorKind, RunOutcome, RunStatus, RunUsage};
 
 /// Folds a session's stream-json lines into [`EngineEvent`]s, deciding which
 /// `result` ends the run.
@@ -43,6 +43,8 @@ pub(super) struct EventMapper {
     /// An `assistant` line reported `error: "authentication_failed"` since the
     /// last `result`.
     auth_failed: bool,
+    /// The model `system/init` reported, stamped onto every `result`.
+    model: Option<String>,
 }
 
 impl EventMapper {
@@ -54,6 +56,9 @@ impl EventMapper {
                 return self.finish().into_iter().collect();
             }
             return Vec::new();
+        }
+        if let Some(model) = init_model(value) {
+            self.model = Some(model);
         }
         if value.get("type").and_then(Value::as_str) == Some("assistant")
             && value.get("error").and_then(Value::as_str) == Some("authentication_failed")
@@ -67,6 +72,7 @@ impl EventMapper {
                     if std::mem::take(&mut self.auth_failed) && outcome.status == RunStatus::Error {
                         outcome.error_kind = Some(RunErrorKind::Auth);
                     }
+                    outcome.model.clone_from(&self.model);
                     EngineEvent::Result(outcome)
                 }
                 other => other,
@@ -91,6 +97,32 @@ impl EventMapper {
     pub(super) fn finish(&mut self) -> Option<EngineEvent> {
         self.held.take().map(EngineEvent::Result)
     }
+}
+
+/// The `model` of a `system` / `init` line.
+fn init_model(value: &Value) -> Option<String> {
+    (value.get("type").and_then(Value::as_str) == Some("system")
+        && value.get("subtype").and_then(Value::as_str) == Some("init"))
+    .then(|| {
+        value
+            .get("model")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    })
+    .flatten()
+}
+
+/// The `usage` / `total_cost_usd` of a `result` line; `None` without a
+/// `usage` object.
+fn result_usage(value: &Value) -> Option<RunUsage> {
+    let usage = value.get("usage").filter(|usage| usage.is_object())?;
+    let tokens = |key: &str| usage.get(key).and_then(Value::as_u64);
+    Some(RunUsage {
+        input_tokens: tokens("input_tokens").unwrap_or(0),
+        output_tokens: tokens("output_tokens").unwrap_or(0),
+        cache_read_tokens: tokens("cache_read_input_tokens"),
+        cost_usd: value.get("total_cost_usd").and_then(Value::as_f64),
+    })
 }
 
 /// Whether the line is a `system` / `session_state_changed` message.
@@ -269,6 +301,7 @@ fn map_result(value: &Value) -> RunOutcome {
         .and_then(Value::as_str)
         .map(str::to_owned);
 
+    let usage = result_usage(value);
     if subtype == "success" && !is_error {
         RunOutcome {
             status: RunStatus::Success,
@@ -276,6 +309,8 @@ fn map_result(value: &Value) -> RunOutcome {
             session_id,
             error: None,
             error_kind: None,
+            model: None,
+            usage,
         }
     } else {
         // The error detail is the result text when present, else the subtype.
@@ -289,6 +324,8 @@ fn map_result(value: &Value) -> RunOutcome {
             session_id,
             error,
             error_kind: auth_status(value).or_else(|| error_kind_of(subtype)),
+            model: None,
+            usage,
         }
     }
 }
@@ -401,6 +438,38 @@ mod tests {
                 session_id: "sess-abc".to_owned()
             }]
         );
+    }
+
+    #[test]
+    fn result_carries_the_init_model_and_the_reported_usage() {
+        let mut mapper = EventMapper::default();
+        mapper.map_line(
+            &json!({ "type": "system", "subtype": "init", "session_id": "s",
+            "model": "claude-opus-4-8" }),
+        );
+        let events = mapper.map_line(&json!({ "type": "result", "subtype": "success",
+            "is_error": false, "result": "ok", "total_cost_usd": 0.25,
+            "usage": { "input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 3 } }));
+        let [EngineEvent::Result(outcome)] = events.as_slice() else {
+            panic!("expected one result, got {events:?}");
+        };
+        assert_eq!(outcome.model.as_deref(), Some("claude-opus-4-8"));
+        assert_eq!(
+            outcome.usage,
+            Some(crate::engine::RunUsage {
+                input_tokens: 10,
+                output_tokens: 5,
+                cache_read_tokens: Some(3),
+                cost_usd: Some(0.25),
+            })
+        );
+
+        // A result without usage reports none.
+        let events = mapper.map_line(&result_line("x"));
+        let [EngineEvent::Result(outcome)] = events.as_slice() else {
+            panic!("expected one result");
+        };
+        assert_eq!(outcome.usage, None);
     }
 
     #[test]

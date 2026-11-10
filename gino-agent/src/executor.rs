@@ -62,16 +62,16 @@ use crate::attachments::{AttachmentError, AttachmentManager, AttachmentSource};
 use crate::db::{Db, DbResult, ThreadRow, new_delivery_id};
 use crate::e2ee::{E2ee, EncryptionFailure, Sealer};
 use crate::engine::{
-    AgentApiAccess, Engine, EngineError, EngineEvent, EngineRegistry, LogLevel, RunStatus, Session,
-    SessionCfg,
+    AgentApiAccess, Engine, EngineError, EngineEvent, EngineRegistry, LogLevel, RunStatus,
+    RunUsage, Session, SessionCfg,
 };
 use crate::failure::{
     AgentFailure, FailureReason, RunnerFailure, classify_engine_error, classify_outcome,
 };
 use crate::memory;
 use crate::protocol::frames::{
-    AttachmentDescriptor, MessageKind, ProvisioningEntry, Sealable, ThreadMessageData,
-    ThreadResultData, ThreadStatus,
+    AttachmentDescriptor, MessageKind, ProvisioningEntry, RunUsageData, Sealable,
+    ThreadMessageData, ThreadResultData, ThreadStatus,
 };
 use crate::provisioning::Provisioner;
 use crate::sandbox::{self, IsolationError, IsolationSpec};
@@ -849,7 +849,14 @@ impl ThreadExecutor {
         // the engine starts. Unavailable inputs fail the thread terminally.
         if let Err(conclusion) = self.materialize_inbound(&thread, &inputs).await {
             return self
-                .conclude(thread, conclusion, started, continuity, Vec::new())
+                .conclude(
+                    thread,
+                    conclusion,
+                    started,
+                    continuity,
+                    Vec::new(),
+                    &RunInfo::default(),
+                )
                 .await;
         }
 
@@ -877,7 +884,14 @@ impl ThreadExecutor {
                     session_id: thread.engine_session_id.clone(),
                 };
                 return self
-                    .conclude(thread, conclusion, started, continuity, Vec::new())
+                    .conclude(
+                        thread,
+                        conclusion,
+                        started,
+                        continuity,
+                        Vec::new(),
+                        &RunInfo::default(),
+                    )
                     .await;
             }
         };
@@ -886,7 +900,14 @@ impl ThreadExecutor {
             Ok(memory) => memory,
             Err(conclusion) => {
                 return self
-                    .conclude(thread, conclusion, started, continuity, Vec::new())
+                    .conclude(
+                        thread,
+                        conclusion,
+                        started,
+                        continuity,
+                        Vec::new(),
+                        &RunInfo::default(),
+                    )
                     .await;
             }
         };
@@ -930,6 +951,11 @@ impl ThreadExecutor {
             task_engine(&self.db, &thread.task_id).or_else(|| non_empty(&thread.engine));
         let (engine_name, engine) = self.engines.resolve(requested.as_deref());
         debug!(thread = %thread.id, engine = %engine_name, "engine selected");
+        let mut run = RunInfo {
+            engine: Some(engine_name.to_owned()),
+            model: cfg.model.clone().or_else(|| engine.default_model()),
+            usage: None,
+        };
         let session: Arc<dyn Session> = match engine.start_session(cfg).await {
             Ok(session) => Arc::from(session),
             Err(err) => {
@@ -939,7 +965,7 @@ impl ThreadExecutor {
                     session_id: thread.engine_session_id.clone(),
                 };
                 return self
-                    .conclude(thread, conclusion, started, continuity, Vec::new())
+                    .conclude(thread, conclusion, started, continuity, Vec::new(), &run)
                     .await;
             }
         };
@@ -957,6 +983,7 @@ impl ThreadExecutor {
                 started,
                 thread.engine_session_id.clone(),
                 &cancel,
+                &mut run,
             )
             .await;
         drop(stream);
@@ -977,7 +1004,7 @@ impl ThreadExecutor {
                 Vec::new(),
             ),
         };
-        self.conclude(thread, conclusion, started, continuity, outputs)
+        self.conclude(thread, conclusion, started, continuity, outputs, &run)
             .await
     }
 
@@ -1058,6 +1085,7 @@ impl ThreadExecutor {
         started: DateTime<Utc>,
         continuity: Continuity,
         outputs: Vec<AttachmentDescriptor>,
+        run: &RunInfo,
     ) -> ThreadRow {
         // An encrypted task's terminal frame is sealed under its current
         // epoch; a task that cannot seal fails `agent.encryption` instead. An
@@ -1077,7 +1105,9 @@ impl ThreadExecutor {
                 Sealing::Withheld,
             ),
         };
-        let done = self.finalize_sealed(thread, conclusion, started, continuity, outputs, &sealing);
+        let done = self.finalize_sealed(
+            thread, conclusion, started, continuity, outputs, &sealing, run,
+        );
         if matches!(done.status.as_str(), SUCCEEDED | FAILED | CANCELLED)
             && let Some(provisioner) = self.provisioning.as_ref()
             && let Err(err) = provisioner.release_scope(&done.task_id).await
@@ -1199,6 +1229,7 @@ impl ThreadExecutor {
             started,
             continuity,
             Vec::new(),
+            &RunInfo::default(),
         )
         .await
     }
@@ -1476,6 +1507,7 @@ impl ThreadExecutor {
         started: DateTime<Utc>,
         prior_session: Option<String>,
         cancel: &Cancel,
+        run: &mut RunInfo,
     ) -> Conclusion {
         let mut session_id = prior_session;
         loop {
@@ -1540,6 +1572,10 @@ impl ThreadExecutor {
                     session_id = Some(id);
                 }
                 Some(EngineEvent::Result(outcome)) => {
+                    if outcome.model.is_some() {
+                        run.model = outcome.model;
+                    }
+                    run.usage = outcome.usage;
                     let resolved = outcome.session_id.or(session_id);
                     return match outcome.status {
                         RunStatus::Success => Conclusion::Success {
@@ -1641,10 +1677,23 @@ impl ThreadExecutor {
         outputs: Vec<AttachmentDescriptor>,
     ) -> ThreadRow {
         let sealing = self.sealing_now(&thread.task_id);
-        self.finalize_sealed(thread, conclusion, started, continuity, outputs, &sealing)
+        self.finalize_sealed(
+            thread,
+            conclusion,
+            started,
+            continuity,
+            outputs,
+            &sealing,
+            &RunInfo::default(),
+        )
     }
 
-    /// [`Self::finalize`] with the frames sealed per `sealing`.
+    /// [`Self::finalize`] with the frames sealed per `sealing`; a terminal
+    /// `thread_result` carries what `run` used.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one argument per terminal thread_result input"
+    )]
     fn finalize_sealed(
         &self,
         thread: ThreadRow,
@@ -1653,6 +1702,7 @@ impl ThreadExecutor {
         continuity: Continuity,
         outputs: Vec<AttachmentDescriptor>,
         sealing: &Sealing,
+        run: &RunInfo,
     ) -> ThreadRow {
         let finished = now();
         let duration_ms = (finished - started).num_milliseconds().max(0);
@@ -1671,7 +1721,7 @@ impl ThreadExecutor {
                 done.engine_session_id.clone_from(&session_id);
                 done.finished_at = Some(to_iso(finished));
                 done.duration_ms = Some(duration_ms);
-                let data = result_data(&done, ThreadStatus::Succeeded, session_id);
+                let data = run.stamp(result_data(&done, ThreadStatus::Succeeded, session_id));
                 self.persist_result(
                     done,
                     ThreadResultData {
@@ -1709,6 +1759,7 @@ impl ThreadExecutor {
                         FailedDetail::Error(error),
                         duration_ms,
                         sealing,
+                        run,
                     )
                 }
             }
@@ -1725,7 +1776,7 @@ impl ThreadExecutor {
                 done.failure_reason = None;
                 done.finished_at = Some(to_iso(finished));
                 done.duration_ms = Some(duration_ms);
-                let data = result_data(&done, ThreadStatus::Cancelled, session_id);
+                let data = run.stamp(result_data(&done, ThreadStatus::Cancelled, session_id));
                 self.persist_result(
                     done,
                     ThreadResultData {
@@ -1811,6 +1862,7 @@ impl ThreadExecutor {
             FailedDetail::Encryption(failure),
             duration_ms,
             &Sealing::Withheld,
+            &RunInfo::default(),
         )
     }
 
@@ -1826,6 +1878,7 @@ impl ThreadExecutor {
         detail: FailedDetail,
         duration_ms: i64,
         sealing: &Sealing,
+        run: &RunInfo,
     ) -> ThreadRow {
         let (error, encryption_error) = match detail {
             FailedDetail::Error(error) => (Some(error), None),
@@ -1838,7 +1891,7 @@ impl ThreadExecutor {
         failed.engine_session_id.clone_from(&kept_session);
         failed.finished_at = Some(to_iso(now()));
         failed.duration_ms = Some(duration_ms);
-        let data = result_data(&failed, ThreadStatus::Failed, kept_session);
+        let data = run.stamp(result_data(&failed, ThreadStatus::Failed, kept_session));
         self.persist_result(
             failed,
             ThreadResultData {
@@ -2141,6 +2194,37 @@ fn result_data(
         final_seq: 0,
         attachments: None,
         encryption_error: None,
+        engine: None,
+        model: None,
+        usage: None,
+    }
+}
+
+/// What a run used, reported on its terminal `thread_result`: the backend, the
+/// model (the engine-reported one, else the per-task model, else the backend's
+/// configured default) and the engine-reported usage. Empty when the run never
+/// reached an engine.
+#[derive(Clone, Debug, Default)]
+struct RunInfo {
+    engine: Option<String>,
+    model: Option<String>,
+    usage: Option<RunUsage>,
+}
+
+impl RunInfo {
+    /// `data` with this run's engine, model and usage.
+    fn stamp(&self, data: ThreadResultData) -> ThreadResultData {
+        ThreadResultData {
+            engine: self.engine.clone(),
+            model: self.model.clone(),
+            usage: self.usage.as_ref().map(|usage| RunUsageData {
+                input_tokens: usage.input_tokens,
+                output_tokens: usage.output_tokens,
+                cache_read_tokens: usage.cache_read_tokens,
+                cost_usd: usage.cost_usd,
+            }),
+            ..data
+        }
     }
 }
 

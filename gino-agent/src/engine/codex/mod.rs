@@ -313,6 +313,10 @@ impl Engine for CodexEngine {
         let session = spawn_session(&settings, &cfg).await?;
         Ok(Box::new(session))
     }
+
+    fn default_model(&self) -> Option<String> {
+        self.settings.model.clone()
+    }
 }
 
 /// Bounds on the captured stderr tail: enough for a startup/auth error banner,

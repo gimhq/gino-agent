@@ -785,6 +785,10 @@ impl Engine for ReloadableEngine {
     async fn start_session(&self, cfg: SessionCfg) -> Result<Box<dyn Session>, EngineError> {
         self.snapshot().start_session(cfg).await
     }
+
+    fn default_model(&self) -> Option<String> {
+        lock(&self.settings).model.clone()
+    }
 }
 
 impl ReloadableEngine {
@@ -840,6 +844,10 @@ impl Engine for ReloadableCodexEngine {
 
     async fn start_session(&self, cfg: SessionCfg) -> Result<Box<dyn Session>, EngineError> {
         self.snapshot().start_session(cfg).await
+    }
+
+    fn default_model(&self) -> Option<String> {
+        lock(&self.settings).model.clone()
     }
 }
 

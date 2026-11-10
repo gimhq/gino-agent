@@ -896,6 +896,8 @@ async fn local_planes_run_and_shut_down_cleanly_while_host_unreachable() {
                     session_id: Some("sess-off".to_owned()),
                     error: None,
                     error_kind: None,
+                    model: None,
+                    usage: None,
                 }),
             ]))
         }

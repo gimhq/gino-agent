@@ -1985,6 +1985,8 @@ mod tests {
                     session_id: Some(self.session_id.to_owned()),
                     error: None,
                     error_kind: None,
+                    model: None,
+                    usage: None,
                 }),
             ])))
         }
@@ -2142,6 +2144,8 @@ mod tests {
                     session_id: Some("sess-flaky".to_owned()),
                     error: Some("run aborted".to_owned()),
                     error_kind: Some(RunErrorKind::MaxTurns),
+                    model: None,
+                    usage: None,
                 })]
             } else {
                 vec![EngineEvent::Result(RunOutcome {
@@ -2150,6 +2154,8 @@ mod tests {
                     session_id: Some("sess-flaky".to_owned()),
                     error: None,
                     error_kind: None,
+                    model: None,
+                    usage: None,
                 })]
             };
             Ok(Box::new(ScriptSession(script)))

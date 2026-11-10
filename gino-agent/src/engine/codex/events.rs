@@ -55,7 +55,7 @@
 
 use serde_json::{Value, json};
 
-use crate::engine::{EngineEvent, LogLevel, RunErrorKind, RunOutcome, RunStatus};
+use crate::engine::{EngineEvent, LogLevel, RunErrorKind, RunOutcome, RunStatus, RunUsage};
 
 /// The fallback error text for a failed turn whose payload carries nothing
 /// readable — an error [`RunOutcome`] must never surface an empty reason.
@@ -116,6 +116,8 @@ impl EventMapper {
                 session_id: self.thread_id.clone(),
                 error: None,
                 error_kind: None,
+                model: None,
+                usage: turn_usage(value),
             })],
             "turn.failed" => vec![self.failure(value.get("error"))],
             // A stream-level `error` is a notice (e.g. "Reconnecting...") and
@@ -221,8 +223,23 @@ impl EventMapper {
             session_id: self.thread_id.clone(),
             error_kind: Some(failure_kind(&error)),
             error: Some(error),
+            model: None,
+            usage: None,
         })
     }
+}
+
+/// The `usage` of a `turn.completed` event; `None` without a `usage` object.
+/// Codex reports no cost.
+fn turn_usage(value: &Value) -> Option<RunUsage> {
+    let usage = value.get("usage").filter(|usage| usage.is_object())?;
+    let tokens = |key: &str| usage.get(key).and_then(Value::as_u64);
+    Some(RunUsage {
+        input_tokens: tokens("input_tokens").unwrap_or(0),
+        output_tokens: tokens("output_tokens").unwrap_or(0),
+        cache_read_tokens: tokens("cached_input_tokens"),
+        cost_usd: None,
+    })
 }
 
 /// `item.started`: the opening [`EngineEvent::ToolUse`] of a tool call.
@@ -366,6 +383,25 @@ mod tests {
         assert_eq!(outcome.session_id.as_deref(), Some("th-1"));
         assert!(outcome.error.is_none());
         assert!(outcome.error_kind.is_none());
+    }
+
+    #[test]
+    fn turn_completed_carries_the_reported_usage() {
+        let mut mapper = EventMapper::new();
+        let events = mapper.map_line(&json!({"type": "turn.completed",
+            "usage": {"input_tokens": 120, "cached_input_tokens": 100, "output_tokens": 7}}));
+        let [EngineEvent::Result(outcome)] = events.as_slice() else {
+            panic!("expected one result, got {events:?}");
+        };
+        assert_eq!(
+            outcome.usage,
+            Some(crate::engine::RunUsage {
+                input_tokens: 120,
+                output_tokens: 7,
+                cache_read_tokens: Some(100),
+                cost_usd: None,
+            })
+        );
     }
 
     #[test]

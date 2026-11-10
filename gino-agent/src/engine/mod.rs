@@ -150,10 +150,19 @@ impl std::fmt::Debug for AgentApiAccess {
     }
 }
 
+/// Token usage and cost of a turn as the engine reported it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct RunUsage {
+    pub(crate) input_tokens: u64,
+    pub(crate) output_tokens: u64,
+    pub(crate) cache_read_tokens: Option<u64>,
+    pub(crate) cost_usd: Option<f64>,
+}
+
 /// The result of a completed turn. Carries the
 /// host-output triple `{status, result, newSessionId}` plus an optional error
 /// detail; the transport maps this onto an `output` frame.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RunOutcome {
     /// Whether the turn succeeded or errored.
     pub(crate) status: RunStatus,
@@ -167,6 +176,10 @@ pub(crate) struct RunOutcome {
     /// reported one. This — never `error`/`result` prose — is what failure
     /// classification keys off.
     pub(crate) error_kind: Option<RunErrorKind>,
+    /// The model the engine reported running, if it reports one.
+    pub(crate) model: Option<String>,
+    /// Token usage and cost, when the engine reports them.
+    pub(crate) usage: Option<RunUsage>,
 }
 
 /// An event emitted while a [`Session`] runs. The
@@ -264,6 +277,11 @@ pub(crate) trait Engine: Send + Sync {
     /// Open a session (fresh or resumed per [`SessionCfg`]). The returned
     /// [`Session`] stays alive until dropped or interrupted.
     async fn start_session(&self, cfg: SessionCfg) -> Result<Box<dyn Session>, EngineError>;
+
+    /// The model a session without a per-task model runs on, when configured.
+    fn default_model(&self) -> Option<String> {
+        None
+    }
 }
 
 /// A live conversation driven by an [`Engine`]. Object-safe.

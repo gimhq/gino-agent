@@ -98,6 +98,8 @@ fn ok_result(result: &str, session_id: &str) -> EngineEvent {
         session_id: Some(session_id.to_owned()),
         error: None,
         error_kind: None,
+        model: None,
+        usage: None,
     })
 }
 
@@ -114,6 +116,8 @@ fn err_result_kind(error: &str, error_kind: Option<RunErrorKind>) -> EngineEvent
         session_id: None,
         error: Some(error.to_owned()),
         error_kind,
+        model: None,
+        usage: None,
     })
 }
 
@@ -1040,6 +1044,8 @@ async fn cancelled_turn_that_settles_gracefully_keeps_the_resume_handle() {
                 session_id: Some("sess-settled".to_owned()),
                 error: Some("aborted by user".to_owned()),
                 error_kind: None,
+                model: None,
+                usage: None,
             }));
             Ok(())
         }
@@ -1525,6 +1531,88 @@ async fn task_model_overrides_the_configured_model_at_spawn() {
         model_for_run(&db, "th-task-model").await.as_deref(),
         Some("claude-opus-4-8")
     );
+}
+
+// -- Run telemetry on thread_result ------------------
+
+/// An engine with a configured default model whose single turn reports
+/// `reported` as its model and some usage.
+struct TelemetryEngine {
+    reported: Option<String>,
+}
+
+#[async_trait]
+impl Engine for TelemetryEngine {
+    fn name(&self) -> &'static str {
+        "telemetry"
+    }
+    async fn start_session(&self, _cfg: SessionCfg) -> Result<Box<dyn Session>, EngineError> {
+        let EngineEvent::Result(mut outcome) = ok_result("done", "sess-t") else {
+            unreachable!()
+        };
+        outcome.model.clone_from(&self.reported);
+        outcome.usage = Some(crate::engine::RunUsage {
+            input_tokens: 10,
+            output_tokens: 4,
+            cache_read_tokens: Some(2),
+            cost_usd: Some(0.5),
+        });
+        Ok(Box::new(MockSession {
+            script: vec![started("sess-t"), EngineEvent::Result(outcome)],
+            stall: false,
+        }))
+    }
+    fn default_model(&self) -> Option<String> {
+        Some("configured-model".to_owned())
+    }
+}
+
+/// The terminal `thread_result` names the engine, the model that ran and the
+/// usage the engine reported.
+#[tokio::test]
+async fn thread_result_reports_engine_model_and_usage() {
+    for (reported, task_model, expected) in [
+        (None, None, "configured-model"),
+        (None, Some("task-model"), "task-model"),
+        (Some("engine-model"), Some("task-model"), "engine-model"),
+    ] {
+        let db = test_db();
+        if let Some(model) = task_model {
+            let guard = lock(&db);
+            let mut row = guard.get_task_row("task-1").unwrap().unwrap();
+            row.model = Some(model.to_owned());
+            guard.update_task_row(&row).unwrap();
+        }
+        let ws = tempfile::tempdir().unwrap();
+        let exec = ThreadExecutor::new(
+            Arc::new(TelemetryEngine {
+                reported: reported.map(str::to_owned),
+            }),
+            Arc::clone(&db),
+            ws.path().to_path_buf(),
+            no_inactivity(),
+        );
+        lock(&db).insert_thread(&pending_thread("th-t", 1)).unwrap();
+        exec.run_thread(
+            pending_thread("th-t", 1),
+            "go".to_owned(),
+            Continuity::Isolated,
+        )
+        .await;
+        let result = results(&db).pop().unwrap();
+        assert_eq!(result.engine.as_deref(), Some("telemetry"));
+        assert_eq!(result.model.as_deref(), Some(expected));
+        let usage = result.usage.unwrap();
+        assert_eq!(
+            (
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.cache_read_tokens,
+                usage.cost_usd
+            ),
+            (10, 4, Some(2), Some(0.5))
+        );
+    }
 }
 
 // -- Task memory ------------------
