@@ -110,16 +110,69 @@ fn the_schema_lists_exactly_the_frames_the_runner_sends() {
     );
 }
 
-#[test]
-fn the_heartbeat_schema_carries_every_reported_field() {
-    let text = schema().to_string();
-    for field in [
-        "activeThreads",
-        "capabilities",
-        "engines",
-        "e2ee",
-        "configVersion",
-    ] {
-        assert!(text.contains(&format!("\"{field}\":")), "{field}");
+/// The `data` schema of frame `name` in the `direction` catalog.
+fn data_schema(direction: &str, name: &str) -> Value {
+    fn find(node: &Value, name: &str) -> Option<Value> {
+        match node {
+            Value::Object(map) => {
+                if node
+                    .pointer("/properties/type/const")
+                    .and_then(Value::as_str)
+                    == Some(name)
+                {
+                    return node.pointer("/properties/data").cloned();
+                }
+                map.values().find_map(|value| find(value, name))
+            }
+            Value::Array(items) => items.iter().find_map(|value| find(value, name)),
+            _ => None,
+        }
     }
+    find(&schema()["$defs"][direction], name).expect("the frame is in the schema")
+}
+
+#[test]
+fn the_schema_carries_every_field_the_runner_reads_or_reports() {
+    let cases: [(&str, &str, &[&str]); 4] = [
+        (
+            "AgentFrame",
+            "heartbeat",
+            &[
+                "activeThreads",
+                "capabilities",
+                "engines",
+                "e2ee",
+                "configVersion",
+                "defaults",
+            ],
+        ),
+        ("AgentFrame", "thread_result", &["engine", "model", "usage"]),
+        ("HostFrame", "task_upsert", &["engine", "model"]),
+        ("HostFrame", "fs_request", &["to", "recursive", "exclusive"]),
+    ];
+    for (direction, frame, fields) in cases {
+        let data = data_schema(direction, frame);
+        for field in fields {
+            assert!(
+                data.pointer(&format!("/properties/{field}")).is_some(),
+                "{frame}.data.{field}"
+            );
+        }
+    }
+    let defaults = data_schema("AgentFrame", "heartbeat")["properties"]["defaults"].clone();
+    for field in ["engine", "model", "baseUrlHost"] {
+        assert!(
+            defaults["properties"].get(field).is_some(),
+            "defaults.{field}"
+        );
+    }
+    let usage = data_schema("AgentFrame", "thread_result")["properties"]["usage"].clone();
+    for field in ["inputTokens", "outputTokens", "cacheReadTokens", "costUsd"] {
+        assert!(usage["properties"].get(field).is_some(), "usage.{field}");
+    }
+    let engine = data_schema("HostFrame", "task_upsert")["properties"]["engine"].to_string();
+    assert!(
+        engine.contains(r#""type":"null""#),
+        "task_upsert.engine accepts null"
+    );
 }

@@ -797,6 +797,41 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     "code"
                   ],
                   "additionalProperties": {}
+                },
+                "engine": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "inputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheReadTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "required": [
@@ -1546,10 +1581,24 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                   "type": "string"
                 },
                 "engine": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "model": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "workdir": {
                   "type": "string"
@@ -2589,6 +2638,41 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                     "code"
                   ],
                   "additionalProperties": {}
+                },
+                "engine": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "inputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheReadTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "required": [
@@ -3339,10 +3423,24 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                   "type": "string"
                 },
                 "engine": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "model": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "workdir": {
                   "type": "string"
