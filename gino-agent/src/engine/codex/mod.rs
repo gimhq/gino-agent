@@ -408,7 +408,62 @@ impl StderrTail {
 }
 
 /// Env keys naming the engine config dir.
-const CONFIG_DIR_ENV_KEYS: [&str; 2] = ["ENGINE_CONFIG_DIR", "CODEX_HOME"];
+const CONFIG_DIR_ENV_KEYS: [&str; 2] = ["ENGINE_CONFIG_DIR", CODEX_HOME_ENV];
+
+/// Codex's own config dir variable.
+const CODEX_HOME_ENV: &str = "CODEX_HOME";
+
+/// Where task-scope skills land under the engine cwd (provisioning target
+/// `skills/<name>`), and where codex looks for skills under its home.
+const TASK_SKILLS_DIR: &str = "skills";
+
+/// The per-thread `CODEX_HOME` of an unisolated run.
+fn codex_home(work_dir: &Path) -> PathBuf {
+    work_dir.join(".codex-home")
+}
+
+/// Prepare the per-thread `CODEX_HOME` at `home` over the global engine config
+/// dir: every top-level global entry except `skills` is symlinked in, so auth,
+/// config, the global `AGENTS.md` and the session rollouts stay shared (the
+/// global `sessions/` is created first so no rollout lands in a per-thread
+/// dir). `skills/` is rebuilt as a real dir holding one symlink per global
+/// `skills/<name>` and per entry of `task_skills`; a task skill replaces a
+/// global one of the same name. An entry codex already created in `home` is
+/// kept.
+fn prepare_codex_home(home: &Path, global: &Path, task_skills: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(global.join("sessions"))?;
+    std::fs::create_dir_all(home)?;
+    for entry in std::fs::read_dir(global)? {
+        let name = entry?.file_name();
+        if name == TASK_SKILLS_DIR {
+            continue;
+        }
+        let link = home.join(&name);
+        if std::fs::symlink_metadata(&link).is_err() {
+            std::os::unix::fs::symlink(global.join(&name), &link)?;
+        }
+    }
+    let skills = home.join(TASK_SKILLS_DIR);
+    if std::fs::symlink_metadata(&skills).is_ok() {
+        // Holds only the links made here; removing it never follows them.
+        std::fs::remove_dir_all(&skills)?;
+    }
+    std::fs::create_dir(&skills)?;
+    for dir in [global.join(TASK_SKILLS_DIR).as_path(), task_skills] {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            continue;
+        };
+        for entry in entries {
+            let entry = entry?;
+            let link = skills.join(entry.file_name());
+            if std::fs::symlink_metadata(&link).is_ok() {
+                std::fs::remove_file(&link)?;
+            }
+            std::os::unix::fs::symlink(entry.path(), &link)?;
+        }
+    }
+    Ok(())
+}
 
 /// The direct (unisolated) `codex exec` launch: binary, argv, env and cwd.
 ///
@@ -458,7 +513,11 @@ fn direct_launch(settings: &CodexSettings, cfg: &SessionCfg) -> Launch {
 }
 
 /// The isolation inputs for one spawn.
-fn launch_context<'a>(settings: &'a CodexSettings, cfg: &'a SessionCfg) -> LaunchContext<'a> {
+fn launch_context<'a>(
+    settings: &'a CodexSettings,
+    cfg: &'a SessionCfg,
+    task_skills_dir: &'a Path,
+) -> LaunchContext<'a> {
     LaunchContext {
         isolation: &settings.isolation,
         task_override: cfg.isolation.as_ref(),
@@ -473,6 +532,7 @@ fn launch_context<'a>(settings: &'a CodexSettings, cfg: &'a SessionCfg) -> Launc
         conversations_max_bytes: cfg.conversations_max_bytes,
         self_exe: settings.self_exe.as_deref(),
         global_config_dir: settings.config_dir.as_deref(),
+        task_skills_dir: Some(task_skills_dir),
         config_dir_keys: &CONFIG_DIR_ENV_KEYS,
         floored: settings.isolation_floored,
     }
@@ -484,7 +544,28 @@ async fn spawn_session(
     settings: &CodexSettings,
     cfg: &SessionCfg,
 ) -> Result<CodexSession, EngineError> {
-    let launch = sandbox::launch(direct_launch(settings, cfg), &launch_context(settings, cfg))?;
+    let task_skills_dir = cfg.cwd.join(TASK_SKILLS_DIR);
+    let mut launch = sandbox::launch(
+        direct_launch(settings, cfg),
+        &launch_context(settings, cfg, &task_skills_dir),
+    )?;
+    if !launch.sandboxed
+        && launch.vm.is_none()
+        && let (Some(global), Some(work_dir)) = (&settings.config_dir, &cfg.work_dir)
+    {
+        let home = codex_home(work_dir);
+        match prepare_codex_home(&home, global, &task_skills_dir) {
+            Ok(()) => {
+                launch.env.retain(|(key, _)| key != CODEX_HOME_ENV);
+                launch
+                    .env
+                    .push((CODEX_HOME_ENV.to_owned(), home.into_os_string()));
+            }
+            Err(err) => {
+                warn!(home = %home.display(), error = %err, "preparing the per-thread CODEX_HOME failed; using the global one");
+            }
+        }
+    }
     // Stderr is captured: a child that dies at startup (bad args, auth failure)
     // writes its reason to stderr only — the bounded tail is surfaced as a log
     // event instead of vanishing into the daemon's inherited stderr.
@@ -853,7 +934,11 @@ mod tests {
                 ("GINO_TASK_ID", "task-1"),
             ]
         );
-        let launched = sandbox::launch(direct.clone(), &launch_context(&settings, &cfg)).unwrap();
+        let launched = sandbox::launch(
+            direct.clone(),
+            &launch_context(&settings, &cfg, Path::new("skills")),
+        )
+        .unwrap();
         assert_eq!(launched, direct);
     }
 
@@ -922,7 +1007,7 @@ mod tests {
         .unwrap();
         let wrapped = sandbox::wrap(
             direct_launch(&settings, &cfg),
-            &launch_context(&settings, &cfg),
+            &launch_context(&settings, &cfg, Path::new("skills")),
             &isolation,
             &SandboxHost::fixture(Some(bin_dir.into_os_string())),
         )
@@ -1400,6 +1485,82 @@ wait $!
             spawns[1].ends_with("resume codex-smoke"),
             "the resumed turn must end in `resume codex-smoke`: {}",
             spawns[1]
+        );
+    }
+
+    /// A codex run with a work dir sees the global and the task-scope skills
+    /// under its per-thread `$CODEX_HOME/skills`, the task one winning a name
+    /// clash, and shares the global auth and session dirs.
+    #[tokio::test]
+    async fn codex_run_sees_global_and_task_skills_under_its_codex_home() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let listing = dir.path().join("skills.log");
+        let fake = dir.path().join("fake-codex.sh");
+        std::fs::write(
+            &fake,
+            r#"#!/usr/bin/env bash
+cat >/dev/null
+{ echo "home=$CODEX_HOME"
+  for s in "$CODEX_HOME"/skills/*; do echo "$(basename "$s")=$(cat "$s/SKILL.md")"; done
+  echo "auth=$(cat "$CODEX_HOME/auth.json")"
+  [ -d "$CODEX_HOME/sessions" ] && echo sessions; } > "$SKILLS_LOG"
+printf '%s
+' '{"type":"thread.started","thread_id":"t"}' '{"type":"turn.completed"}'
+"#,
+        )
+        .expect("write stub");
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let global = dir.path().join("engine-config");
+        let skill = |root: &Path, name: &str, body: &str| {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+            std::fs::write(root.join(name).join("SKILL.md"), body).unwrap();
+        };
+        skill(&global.join("skills"), "shared", "global-shared");
+        skill(&global.join("skills"), "global-only", "global-only");
+        std::fs::write(global.join("auth.json"), "global-auth").unwrap();
+        let work_dir = dir.path().join("threads").join("th-1");
+        let project = work_dir.join("project");
+        skill(&project.join("skills"), "shared", "task-shared");
+        skill(&project.join("skills"), "task-only", "task-only");
+
+        let engine = CodexEngine::new(CodexSettings {
+            binary: fake,
+            env: vec![("SKILLS_LOG".to_owned(), listing.display().to_string())],
+            config_dir: Some(global.clone()),
+            ..CodexSettings::default()
+        });
+        for _ in 0..2 {
+            let session = start(
+                &engine,
+                SessionCfg {
+                    cwd: project.clone(),
+                    work_dir: Some(work_dir.clone()),
+                    initial_prompt: Some("hi".to_owned()),
+                    ..SessionCfg::default()
+                },
+            )
+            .await;
+            let (_, outcome) = drain(session.as_ref()).await;
+            assert_eq!(outcome.status, RunStatus::Success);
+        }
+
+        let seen = std::fs::read_to_string(&listing).expect("listing");
+        assert_eq!(
+            seen.lines().collect::<Vec<_>>(),
+            [
+                format!("home={}", work_dir.join(".codex-home").display()).as_str(),
+                "global-only=global-only",
+                "shared=task-shared",
+                "task-only=task-only",
+                "auth=global-auth",
+                "sessions",
+            ],
+            "the second run rebuilds the same view"
+        );
+        assert!(
+            global.join("sessions").is_dir(),
+            "rollouts go to the shared sessions dir"
         );
     }
 

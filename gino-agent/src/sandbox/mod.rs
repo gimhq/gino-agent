@@ -903,6 +903,9 @@ pub(crate) struct LaunchContext<'a> {
     pub(crate) self_exe: Option<&'a Path>,
     /// Provisioning dir holding the global `CLAUDE.md` and `skills/`.
     pub(crate) global_config_dir: Option<&'a Path>,
+    /// Task-scope skills dir whose entries join the engine home's `skills/`
+    /// next to the global ones (codex: `<project>/skills`); task skills win.
+    pub(crate) task_skills_dir: Option<&'a Path>,
     /// Env keys naming the engine config dir; sandboxed, they name the engine home.
     pub(crate) config_dir_keys: &'a [&'a str],
     /// A local isolation floor is configured.
@@ -1329,7 +1332,8 @@ pub(crate) fn wrap(
         cwd,
         engine_home: engine_home(work_dir),
         global_config_dir: ctx.global_config_dir.map(Path::to_path_buf),
-        globals: ProvisionedGlobals::inspect(ctx.global_config_dir),
+        globals: ProvisionedGlobals::inspect(ctx.global_config_dir)
+            .with_task_skills(ctx.task_skills_dir, ctx.workspace_dir),
         engine_binary,
         agent_exe: agent_exe.to_path_buf(),
         home: host.home.clone(),
@@ -2675,6 +2679,7 @@ mod tests {
             conversations_max_bytes: DEFAULT_CONVERSATIONS_MAX_BYTES,
             self_exe,
             global_config_dir: None,
+            task_skills_dir: None,
             config_dir_keys: &KEYS,
             floored: false,
         }

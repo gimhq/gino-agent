@@ -549,6 +549,7 @@ fn key_files_are_never_exposed_to_an_engine_launch() {
         conversations_max_bytes: DEFAULT_CONVERSATIONS_MAX_BYTES,
         self_exe: Some(&agent),
         global_config_dir: None,
+        task_skills_dir: None,
         config_dir_keys: &keys,
         floored: false,
     };

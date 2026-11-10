@@ -87,6 +87,42 @@ impl ProvisionedGlobals {
             skills: inspect_skills(&dir.join("skills")),
         })
     }
+
+    /// Merge the entries of a task-scope skills dir into [`Self::skills`]; a
+    /// task skill replaces a global one of the same name. The dir lies in the
+    /// engine-writable work dir, so only links resolving inside the workspace
+    /// store (the ones provisioning made) count; anything else is skipped.
+    pub(crate) fn with_task_skills(
+        mut self,
+        task_skills_dir: Option<&Path>,
+        workspace_dir: &Path,
+    ) -> Self {
+        let (Some(dir), Ok(store)) = (task_skills_dir, fs::canonicalize(store_dir(workspace_dir)))
+        else {
+            return self;
+        };
+        let Ok(entries) = fs::read_dir(dir) else {
+            return self;
+        };
+        let task: Vec<SkillBind> = entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_symlink()))
+            .filter_map(|entry| {
+                let bind = entry_bind(&entry.path(), &store)?;
+                let meta = fs::metadata(&bind.source).ok()?;
+                (meta.is_dir() || meta.is_file()).then(|| SkillBind {
+                    name: entry.file_name(),
+                    source: bind.source,
+                    is_dir: meta.is_dir(),
+                })
+            })
+            .collect();
+        self.skills
+            .retain(|global| !task.iter().any(|skill| skill.name == global.name));
+        self.skills.extend(task);
+        self.skills.sort_by(|a, b| a.name.cmp(&b.name));
+        self
+    }
 }
 
 /// Resolve every entry of `skills_dir` to its canonical file or dir target.
@@ -1162,6 +1198,51 @@ mod tests {
         prepare_engine_home(&l).unwrap();
         assert!(l.engine_home.is_dir());
         assert_eq!(fs::read_dir(&l.engine_home).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn task_skills_join_the_global_ones_and_win_a_name_clash() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = fs::canonicalize(tmp.path()).unwrap();
+        let store = super::store_dir(&root);
+        for dir in [
+            "global/skills/alpha",
+            "global/skills/shared",
+            "task",
+            "outside",
+        ] {
+            fs::create_dir_all(root.join(dir)).unwrap();
+        }
+        for name in ["shared", "beta"] {
+            fs::create_dir_all(store.join(name).join("h1")).unwrap();
+            symlink(store.join(name).join("h1"), root.join("task").join(name)).unwrap();
+        }
+        // Not made by provisioning: a real dir and a link out of the store.
+        fs::create_dir(root.join("task/real")).unwrap();
+        symlink(root.join("outside"), root.join("task/escape")).unwrap();
+
+        let globals = ProvisionedGlobals::inspect(Some(&root.join("global")))
+            .with_task_skills(Some(&root.join("task")), &root);
+        assert_eq!(
+            globals
+                .skills
+                .iter()
+                .map(|skill| (skill.name.to_str().unwrap(), skill.source.clone()))
+                .collect::<Vec<_>>(),
+            [
+                ("alpha", root.join("global/skills/alpha")),
+                ("beta", store.join("beta/h1")),
+                ("shared", store.join("shared/h1")),
+            ]
+        );
+        let unchanged = ProvisionedGlobals::inspect(Some(&root.join("global")));
+        assert_eq!(unchanged.clone().with_task_skills(None, &root), unchanged);
+        assert_eq!(
+            unchanged
+                .clone()
+                .with_task_skills(Some(&root.join("missing")), &root),
+            unchanged
+        );
     }
 
     #[test]

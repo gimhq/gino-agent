@@ -575,6 +575,7 @@ fn launch_context<'a>(settings: &'a ClaudeSettings, cfg: &'a SessionCfg) -> Laun
         conversations_max_bytes: cfg.conversations_max_bytes,
         self_exe: settings.self_exe.as_deref(),
         global_config_dir: settings.config_dir.as_deref(),
+        task_skills_dir: None,
         config_dir_keys: &CONFIG_DIR_ENV_KEYS,
         floored: settings.isolation_floored,
     }

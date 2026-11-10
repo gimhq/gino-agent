@@ -339,8 +339,15 @@ stream ends, and `drain_cancelled` settles the thread `cancelled`.
 **Config.** The `engine.codex` block — `binary`, `model`, `approvalPolicy`, `sandboxMode`,
 `skipGitRepoCheck`, `extraArgs`, plus `openaiApiKey` / `openaiBaseUrl` (handed to the child as the
 `CODEX_API_KEY` env and a `-c openai_base_url=...` override, the forms `codex exec` reads) — is additive: an absent field leaves the backend default in place. The
-provisioned engine config dir (§9b) is exported to a codex child as `ENGINE_CONFIG_DIR` + **`CODEX_HOME`**,
-the way it is `ENGINE_CONFIG_DIR` + `CLAUDE_CONFIG_DIR` for claude.
+provisioned engine config dir (§9b) is exported to a codex child as `ENGINE_CONFIG_DIR`; its
+**`CODEX_HOME`** is a per-thread `<work_dir>/.codex-home` built over that dir: every top-level global entry
+except `skills` is symlinked in (auth, `config.toml`, the global `AGENTS.md` and the `sessions/` rollouts stay
+shared; the global `sessions/` is created first), and `skills/` is rebuilt before each run with one symlink per
+global `skills/<name>` and per task-scope `project/skills/<name>` (the task skill wins a name clash). Codex
+discovers skills only under `CODEX_HOME/skills`, so a host targets codex task skills at `skills/<name>` and
+claude task skills at `.claude/skills/<name>`. Without a work dir the child gets the global dir as
+`CODEX_HOME`. Sandboxed and VM runs use the engine home instead (§9d), whose `skills/` view merges the same
+task-scope `skills/<name>` entries.
 
 **Engine binaries and installs.** Each backend starts, in this order: an explicitly configured binary
 (`engine.codex.binary`; claude has none), else the agent-managed install in
@@ -548,7 +555,9 @@ task's tree is mounted.
 
 **Engine home.** Each thread gets `<work_dir>/.engine-home`, exported as `ENGINE_CONFIG_DIR` plus
 `CLAUDE_CONFIG_DIR` (claude) or `CODEX_HOME` (codex). The global `CLAUDE.md` and `skills/` (§9b) are bound
-into it read-only when present. `claude login` state in the global dir is **not** visible, so credentials
+into it read-only when present; for codex the task-scope `project/skills/<name>` entries join that `skills/`
+view, replacing a global skill of the same name. Only links resolving into the workspace store count (the
+work dir is engine-writable, so anything else a run left there is never bound). `claude login` state in the global dir is **not** visible, so credentials
 must come from the environment: `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, or the host proxy
 (`ANTHROPIC_BASE_URL`). The engine also gets `HOME`, `TMPDIR=/tmp` and `GINO_SANDBOX=1`.
 

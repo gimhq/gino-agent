@@ -666,7 +666,8 @@ fn launch_var<'a>(launch: &'a Launch, key: &str) -> Option<&'a std::ffi::OsStr> 
 fn view_entries(ctx: &LaunchContext<'_>, work_dir: &Path, home: &Path) -> Vec<ViewEntry> {
     let mut view = Vec::new();
     if let Some(global) = ctx.global_config_dir {
-        let globals = ProvisionedGlobals::inspect(Some(global));
+        let globals = ProvisionedGlobals::inspect(Some(global))
+            .with_task_skills(ctx.task_skills_dir, ctx.workspace_dir);
         if globals.claude_md {
             view.push(ViewEntry {
                 source: ViewSource::Path(global.join("CLAUDE.md")),
@@ -2129,6 +2130,7 @@ mod launch_tests {
                 conversations_max_bytes: crate::sandbox::DEFAULT_CONVERSATIONS_MAX_BYTES,
                 self_exe: Some(&self.exe),
                 global_config_dir: Some(&self.global),
+                task_skills_dir: None,
                 config_dir_keys: &KEYS,
                 floored: false,
             }
@@ -3509,6 +3511,7 @@ mod launch_tests {
             conversations_max_bytes: crate::sandbox::DEFAULT_CONVERSATIONS_MAX_BYTES,
             self_exe: Some(&agent),
             global_config_dir: Some(&global),
+            task_skills_dir: None,
             config_dir_keys: &KEYS,
             floored: false,
         };
@@ -3617,6 +3620,7 @@ mod launch_tests {
             conversations_max_bytes: crate::sandbox::DEFAULT_CONVERSATIONS_MAX_BYTES,
             self_exe: Some(&agent),
             global_config_dir: None,
+            task_skills_dir: None,
             config_dir_keys: &KEYS,
             floored: false,
         };

@@ -309,6 +309,18 @@ Field semantics:
   implicit per-task continue on an absent `threadId`. Cron-fired thread ids are the one
   agent-minted family the host sees (`<cronId>@<epoch>` / `<cronId>@shared`, §7): they
   arrive only on agent→host frames and are never a task's `current_thread_id`.
+- `entries` targets per engine (`config.entries` and `task_upsert.data.entries`): the agent
+  lands each entry at `<scope root>/<target>`; the scope root is the engine config dir for the
+  global scope and the thread's `project/` dir (the engine cwd) for the task scope.
+
+  | engine | instruction file (`kind: file`) | task-scope skill (`kind: dir`) | global skill (`kind: dir`) |
+  |---|---|---|---|
+  | `claude` | `CLAUDE.md` | `.claude/skills/<name>` | `skills/<name>` |
+  | `codex` | `AGENTS.md` | `skills/<name>` | `skills/<name>` |
+
+  A codex run reads skills from its `CODEX_HOME/skills`, which the agent builds per thread from
+  the global `skills/<name>` and the task-scope `skills/<name>` entries (a task skill wins a name
+  clash). A task that may run on either engine can carry both skill targets.
 - `meta.memory` (`task_upsert`) is an optional, additive field (protocol version
   unchanged): `{task?: "on"|"off", agent?: "rw"|"ro"|"off"}`; unknown keys are rejected and
   `meta` itself stays an open record. The host validates the shape on task creation (admin
