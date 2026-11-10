@@ -1305,14 +1305,16 @@ fn handle_cron_upsert(
 ///
 /// Every field follows the OMISSION-PRESERVES rule the `entries` column already
 /// had: an absent field leaves the stored value alone, so a partial `task_upsert`
-/// never wipes a definition the host pushed earlier. The task DEFINITION fields
+/// never wipes a definition the host pushed earlier. An explicit `null` on
+/// `engine` / `model` clears the stored value, so the next spawn uses the runner
+/// default. The task DEFINITION fields
 /// (`engine`/`model`/`workdir`/`meta`) ride the same rule; only `model`
 /// reaches execution today (at the next engine spawn, see
 /// [`crate::executor`]) — `workdir` and `meta` are persisted and nothing more.
 fn apply_task_def(db: &Mutex<Db>, task_id: &str, data: &TaskUpsertData) -> bool {
     let guard = lock_db(db);
     let now_iso = to_iso(now());
-    warn_unsupported_engine(task_id, data.engine.as_deref());
+    warn_unsupported_engine(task_id, data.engine.clone().flatten().as_deref());
     let Ok(meta) = task_meta_json(task_id, data) else {
         return false;
     };
@@ -1328,10 +1330,10 @@ fn apply_task_def(db: &Mutex<Db>, task_id: &str, data: &TaskUpsertData) -> bool 
                 row.status.clone_from(status);
             }
             if let Some(engine) = &data.engine {
-                row.engine = Some(engine.clone());
+                row.engine.clone_from(engine);
             }
             if let Some(model) = &data.model {
-                row.model = Some(model.clone());
+                row.model.clone_from(model);
             }
             if let Some(workdir) = &data.workdir {
                 row.workdir = Some(workdir.clone());
@@ -1352,8 +1354,8 @@ fn apply_task_def(db: &Mutex<Db>, task_id: &str, data: &TaskUpsertData) -> bool 
                 name: data.name.clone(),
                 kind: data.kind.clone(),
                 status: data.status.clone().unwrap_or_else(|| "active".to_owned()),
-                engine: data.engine.clone(),
-                model: data.model.clone(),
+                engine: data.engine.clone().flatten(),
+                model: data.model.clone().flatten(),
                 workdir: data.workdir.clone(),
                 meta,
                 created_at: now_iso.clone(),

@@ -201,7 +201,7 @@ agent-architecture); bytes never travel in frames.
 
 | type | envelope ids | data | meaning |
 |---|---|---|---|
-| `task_upsert` | `taskId` | `{name?, kind?, status?, engine?, model?, workdir?, meta?, entries?, e2ee?}` | seed/modify a task (the global top entity); `engine`/`model`/`workdir`/`meta` are the task definition, `entries` the task-scope provisioning set (M8), `e2ee` marks an encrypted task (§5.3) |
+| `task_upsert` | `taskId` | `{name?, kind?, status?, engine?, model?, workdir?, meta?, entries?, e2ee?}` | seed/modify a task (the global top entity); `engine`/`model`/`workdir`/`meta` are the task definition, `entries` the task-scope provisioning set (M8), `e2ee` marks an encrypted task (§5.3); an absent field keeps the stored value and `null` clears `engine` or `model`, so the next spawn uses the agent default |
 | `task_delete` | `taskId` | — | remove a task |
 | `cron_upsert` | `taskId`, `cronId` | `{kind, prompt, schedule_type?, schedule_value?, continuity, next_run?, status?}` | seed/modify a trigger under a task; `prompt` (required) is the recurring instruction the cron runs each fire |
 | `cron_delete` | `taskId`, `cronId` | — | remove a trigger |

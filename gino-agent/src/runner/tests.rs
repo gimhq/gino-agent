@@ -483,6 +483,21 @@ async fn task_delete_parks_the_tasks_work_until_a_task_upsert_reactivates_it() {
 /// (insert-new and patch-existing); a later `task_upsert` that OMITS `entries`
 /// must leave the prior set intact, while an explicit (empty) set replaces it.
 #[test]
+fn task_upsert_null_clears_engine_and_model_and_absent_keeps_them() {
+    let db = Mutex::new(Db::open_in_memory().unwrap());
+    let upsert = |data: serde_json::Value| {
+        apply_task_def(&db, "t-null", &serde_json::from_value(data).unwrap());
+        let row = lock_db(&db).get_task_row("t-null").unwrap().unwrap();
+        (row.engine, row.model)
+    };
+
+    let set = (Some("codex".to_owned()), Some("m-1".to_owned()));
+    assert_eq!(upsert(json!({"engine": "codex", "model": "m-1"})), set);
+    assert_eq!(upsert(json!({"name": "renamed"})), set);
+    assert_eq!(upsert(json!({"model": null})), (set.0.clone(), None));
+    assert_eq!(upsert(json!({"engine": null})), (None, None));
+}
+#[test]
 fn task_upsert_persists_entries_and_omission_preserves_them() {
     let db = Mutex::new(Db::open_in_memory().unwrap());
     let entry = ProvisioningEntry {
@@ -578,8 +593,8 @@ fn task_upsert_persists_definition_and_omission_preserves_it() {
             name: Some("build".to_owned()),
             kind: Some("agent".to_owned()),
             status: Some("active".to_owned()),
-            engine: Some("claude".to_owned()),
-            model: Some("claude-opus-4-8".to_owned()),
+            engine: Some(Some("claude".to_owned())),
+            model: Some(Some("claude-opus-4-8".to_owned())),
             workdir: Some("/srv/project".to_owned()),
             meta: Some(json!({ "team": "infra" })),
             entries: None,
@@ -633,7 +648,7 @@ fn task_upsert_persists_definition_and_omission_preserves_it() {
             kind: None,
             status: None,
             engine: None,
-            model: Some("claude-sonnet-4-6".to_owned()),
+            model: Some(Some("claude-sonnet-4-6".to_owned())),
             workdir: None,
             meta: None,
             entries: None,
@@ -667,7 +682,7 @@ async fn unsupported_engine_is_stored_but_never_fails_the_task() {
                 name: None,
                 kind: None,
                 status: Some("active".to_owned()),
-                engine: Some("codex".to_owned()),
+                engine: Some(Some("codex".to_owned())),
                 model: None,
                 workdir: None,
                 meta: None,

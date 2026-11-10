@@ -406,8 +406,9 @@ pub(crate) mod frames {
     ///
     /// Every field is optional and carries OMISSION-PRESERVES semantics: an
     /// absent field leaves whatever the runner already stored for the task
-    /// untouched (it is never a "clear this"), so a host may push a partial
-    /// definition without wiping the rest.
+    /// untouched, so a host may push a partial definition without wiping the
+    /// rest. `engine` and `model` also accept `null`, which clears the stored
+    /// value (`Some(None)`).
     #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
     pub(crate) struct TaskUpsertData {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -422,12 +423,22 @@ pub(crate) mod frames {
         /// whose backend is not registered on this runner — is warned about and
         /// runs on the DEFAULT backend rather than failing the task
         /// ([`crate::runner`]).
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub(crate) engine: Option<String>,
+        #[serde(
+            default,
+            deserialize_with = "nullable",
+            skip_serializing_if = "Option::is_none"
+        )]
+        #[allow(clippy::option_option, reason = "absent, null and a value differ")]
+        pub(crate) engine: Option<Option<String>>,
         /// Per-task model id overriding `config.engine.model` at the NEXT engine
-        /// spawn (never hot-swapped into a live session).
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub(crate) model: Option<String>,
+        /// spawn (never hot-swapped into a live session); `null` clears it.
+        #[serde(
+            default,
+            deserialize_with = "nullable",
+            skip_serializing_if = "Option::is_none"
+        )]
+        #[allow(clippy::option_option, reason = "absent, null and a value differ")]
+        pub(crate) model: Option<Option<String>>,
         /// Host-side working directory hint. PERSISTED ONLY — nothing in the
         /// runner reads it yet (the executor still materializes its own
         /// workspace under `paths.workspace_dir`).
@@ -446,6 +457,17 @@ pub(crate) mod frames {
         /// the runner it is never cleared.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) e2ee: Option<TaskE2ee>,
+    }
+
+    /// Tell an absent field (`None`, through `#[serde(default)]`) from an
+    /// explicit `null` (`Some(None)`).
+    #[allow(clippy::option_option, reason = "absent, null and a value differ")]
+    fn nullable<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        Option::<T>::deserialize(deserializer).map(Some)
     }
 
     /// `data` of a `cron_upsert` (ids are the envelope `taskId`/`cronId`).
