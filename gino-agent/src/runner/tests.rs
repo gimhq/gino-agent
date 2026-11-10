@@ -168,6 +168,7 @@ async fn serve_context(db: Arc<Mutex<Db>>, dir: &std::path::Path) -> ServeContex
         engine_config_dir: dir.to_path_buf(),
         config: Mutex::new(crate::config::LayeredConfig::new(config)),
         config_version: Arc::default(),
+        defaults: Arc::default(),
         engine_settings: settings.claude,
         codex_settings: settings.codex,
         remote_ops,

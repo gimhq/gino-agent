@@ -56,7 +56,9 @@ use crate::engine::codex::{self, CodexEngine, CodexSettings};
 use crate::engine::{Engine, EngineError, Session, SessionCfg};
 use crate::executor::{ThreadExecutor, WatchdogCfg};
 use crate::memory;
-use crate::protocol::frames::{CronUpsertData, InboundFrame, ProvisioningEntry, TaskUpsertData};
+use crate::protocol::frames::{
+    CronUpsertData, InboundFrame, ProvisioningEntry, RunnerDefaults, TaskUpsertData,
+};
 use crate::provisioning::{BlobFetcher, Provisioner};
 use crate::register::{self, ResolvedIdentity};
 use crate::remote_ops::RemoteOps;
@@ -262,12 +264,14 @@ async fn run_async(
     let (e2ee_live_tx, e2ee_live_rx) = mpsc::unbounded_channel();
     let e2ee_ds = Arc::new(DsLink::default());
     let config_version = Arc::new(Mutex::new(config.config_version));
+    let defaults = Arc::new(Mutex::new(Some(config.runner_defaults())));
     let transport_config = TransportConfig {
         heartbeat: Duration::from_millis(config.heartbeat_interval_ms),
         capabilities,
         engines,
         e2ee: Some(e2ee_capability),
         config_version: Arc::clone(&config_version),
+        defaults: Arc::clone(&defaults),
         e2ee_live: Some(e2ee_live_tx),
         e2ee_ds: Some(Arc::clone(&e2ee_ds)),
         ..TransportConfig::default()
@@ -386,6 +390,7 @@ async fn run_async(
         engine_config_dir,
         config: Mutex::new(layered),
         config_version,
+        defaults,
         engine_settings: seams.claude,
         codex_settings: seams.codex,
         remote_ops,
@@ -1030,6 +1035,8 @@ struct ServeContext {
     config: Mutex<LayeredConfig>,
     /// The applied config version heartbeats report.
     config_version: Arc<Mutex<Option<i64>>>,
+    /// The runner defaults heartbeats report, recomputed on every merge.
+    defaults: Arc<Mutex<Option<RunnerDefaults>>>,
     /// The live engine-settings seam: replaced on `config_update`,
     /// snapshotted by [`ReloadableEngine`] at every engine spawn.
     engine_settings: SharedEngineSettings,
@@ -1582,6 +1589,7 @@ fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) -> bool
                 return false;
             }
         };
+        *lock(&context.defaults) = Some(config.runner_defaults());
         context.remote_ops.configure(
             config.remote_ops.fs,
             config.remote_ops.pty,

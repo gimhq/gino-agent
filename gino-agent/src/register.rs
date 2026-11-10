@@ -279,6 +279,7 @@ async fn register(
         version: env!("CARGO_PKG_VERSION").to_owned(),
         platform: platform_string(),
         e2ee: e2ee.cloned(),
+        defaults: Some(config.runner_defaults()),
     };
 
     let url = config.register_url()?;
@@ -852,6 +853,7 @@ mod tests {
             version: "0.0.0".to_owned(),
             platform: "test".to_owned(),
             e2ee: None,
+            defaults: None,
         }
     }
 

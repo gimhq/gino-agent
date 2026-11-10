@@ -58,7 +58,8 @@ Request:
   "name": "<human label?>", "capabilities": ["claude", ...],
   "version": "<agent build version?>", "platform": "<arch-os?>", "source": "docker|vm|bare?",
   "e2ee": { "versions": [1], "mls_suites": [1],
-            "credential": { "type": "basic", "public_key": "<base64url Ed25519 key>" } } }
+            "credential": { "type": "basic", "public_key": "<base64url Ed25519 key>" } },
+  "defaults": { "engine": "claude", "model": "<model?>", "baseUrlHost": "<host?>" } }
 ```
 Response (success):
 ```json
@@ -125,6 +126,11 @@ Rules:
   (§5) so the directory holds the latest copy; a different `public_key` for the same `agentId` is
   never applied silently but recorded as a key change awaiting an operator re-pin. A runner
   without the object never receives encrypted work (§5.3).
+- `defaults` (optional, additive) is what a task without its own `engine`/`model` runs with:
+  `engine` (always present), `model` (`config.engine.model`, omitted when unset) and `baseUrlHost`
+  (only the host of `config.engine.anthropicBaseUrl` — never the full URL, credentials, path,
+  port or query; omitted when unset). It never carries a key. The same object rides on every
+  `heartbeat` (§5), recomputed after each `config_update`.
 - `config.engine.isolation` (optional, additive) is the host-delivered default isolation for engine
   runs, delivered the same three ways as `config.entries`:
   `{"mode"?: "off|sandbox|vm", "network"?: {"mode"?: "none|full|allowlist", "allow"?: [rule]},
@@ -192,7 +198,7 @@ agent-architecture); bytes never travel in frames.
 | `thread_result` | `taskId`, `threadId` | `{status, result?, error?, failure_reason?, engine_session_id?, duration_ms, final_seq, attachments?, encryption_error?, engine?, model?, usage?}` | terminal outcome of one execution (mirror → `thread_runs`) |
 | `thread_message` | `taskId`, `threadId` | `{seq, kind, role?, content?, tool?, input?, output?, tool_use_id?, parent_tool_use_id?}` | one ordered transcript event (mirror → `messages`) |
 | `cron_state` | `taskId`, `cronId` | `{kind, schedule_type?, schedule_value?, continuity?, next_run?, status?, round_count, skipped_count, last_status?}` | local scheduling-ledger summary (mirror → `crons`) |
-| `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, configVersion?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engine binaries the agent starts, `{name, version?, path}` each, probed in the background at startup (heartbeats before the probe finishes omit it); `configVersion` is the last config `version` the agent applied (§3), omitted until one arrives |
+| `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, configVersion?, defaults?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engine binaries the agent starts, `{name, version?, path}` each, probed in the background at startup (heartbeats before the probe finishes omit it); `configVersion` is the last config `version` the agent applied (§3), omitted until one arrives; `defaults` is the register object (§3), recomputed after every `config_update` |
 | `fs_response` | `reqId` | `{ok, entries? \| stat? \| sha256 + size, error?}` | answers the `fs_request` with the same `reqId`; live-only |
 | `e2ee_key_packages` | — | `{one_time?, last_resort?}` | publish KeyPackages to the host's key directory (§5.3) |
 | `e2ee_request` | `taskId`, `reqId` | `{op, …}` | one Delivery Service operation on the task's group (§5.3); live-only |
@@ -997,6 +1003,24 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                   "type": "integer",
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
+                },
+                "defaults": {
+                  "type": "object",
+                  "properties": {
+                    "engine": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "baseUrlHost": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "engine"
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "additionalProperties": {}
@@ -2768,6 +2792,24 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                   "type": "integer",
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
+                },
+                "defaults": {
+                  "type": "object",
+                  "properties": {
+                    "engine": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "baseUrlHost": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "engine"
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "additionalProperties": {}

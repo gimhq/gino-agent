@@ -770,6 +770,16 @@ impl StubHost {
         self.poll(timeout, |m| m.heartbeats.len() >= count).await
     }
 
+    /// Wait (≤`timeout`) until a heartbeat carries `defaults` equal to `defaults`.
+    pub async fn wait_heartbeat_defaults(&self, defaults: &Value, timeout: Duration) -> bool {
+        self.poll(timeout, |m| {
+            m.heartbeats
+                .iter()
+                .any(|heartbeat| &heartbeat["defaults"] == defaults)
+        })
+        .await
+    }
+
     /// Wait (≤`timeout`) until a heartbeat reports `version` as `configVersion`.
     pub async fn wait_heartbeat_config_version(&self, version: i64, timeout: Duration) -> bool {
         self.poll(timeout, |m| {

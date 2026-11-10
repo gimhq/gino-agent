@@ -34,7 +34,7 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::memory::{AgentMemoryAccess, TaskMemory};
-use crate::protocol::frames::ProvisioningEntry;
+use crate::protocol::frames::{ProvisioningEntry, RunnerDefaults};
 use crate::sandbox::{self, IsolationError, IsolationSpec};
 
 /// Default workspace directory (configurable; never a hardcoded Docker mount).
@@ -634,6 +634,20 @@ impl Config {
             _ => return Err(ConfigError::InvalidHostScheme(base.to_owned())),
         };
         Ok(format!("{ws_base}/agent/ws/{agent_id}"))
+    }
+
+    /// The engine defaults register and heartbeats report: the engine an
+    /// unpinned task runs, its model and only the host of the base URL.
+    pub(crate) fn runner_defaults(&self) -> RunnerDefaults {
+        RunnerDefaults {
+            engine: "claude".to_owned(),
+            model: self.engine.model.clone(),
+            base_url_host: self
+                .engine
+                .anthropic_base_url
+                .as_deref()
+                .and_then(|url| reqwest::Url::parse(url).ok()?.host_str().map(str::to_owned)),
+        }
     }
 }
 
@@ -1717,6 +1731,31 @@ mod tests {
         // The host re-pushes the full desired set: an explicit `[]` replaces to empty.
         config.apply(ConfigOverlay::from_json(r#"{ "entries": [] }"#).unwrap());
         assert!(config.entries.as_ref().unwrap().is_empty());
+    }
+
+    #[test]
+    fn runner_defaults_report_the_model_and_only_the_base_url_host() {
+        use crate::protocol::frames::RunnerDefaults;
+
+        let mut config = Config::default();
+        assert_eq!(
+            config.runner_defaults(),
+            RunnerDefaults {
+                engine: "claude".to_owned(),
+                model: None,
+                base_url_host: None
+            }
+        );
+        config.apply(
+            ConfigOverlay::from_json(
+                r#"{ "engine": { "model": "m-1",
+                    "anthropicBaseUrl": "https://user:secret@proxy.example:8443/llm?key=k" } }"#,
+            )
+            .unwrap(),
+        );
+        let defaults = config.runner_defaults();
+        assert_eq!(defaults.model.as_deref(), Some("m-1"));
+        assert_eq!(defaults.base_url_host.as_deref(), Some("proxy.example"));
     }
 
     #[test]

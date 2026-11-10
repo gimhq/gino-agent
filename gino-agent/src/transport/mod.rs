@@ -118,6 +118,8 @@ pub(crate) struct TransportConfig {
     pub(crate) e2ee: Option<E2eeCapability>,
     /// The applied config version heartbeats report (`data.configVersion`).
     pub(crate) config_version: Arc<std::sync::Mutex<Option<i64>>>,
+    /// The runner defaults heartbeats report (`data.defaults`).
+    pub(crate) defaults: Arc<std::sync::Mutex<Option<crate::protocol::frames::RunnerDefaults>>>,
     /// Receives the live-only e2ee frames (`e2ee_key_package_status`,
     /// `e2ee_response`), which bypass the inbox; without it they are dropped.
     pub(crate) e2ee_live: Option<mpsc::UnboundedSender<E2eeLiveFrame>>,
@@ -144,6 +146,7 @@ impl Default for TransportConfig {
             engines: Arc::default(),
             e2ee: None,
             config_version: Arc::default(),
+            defaults: Arc::default(),
             e2ee_live: None,
             e2ee_ds: None,
             read_timeout: DEFAULT_READ_TIMEOUT,
@@ -212,6 +215,7 @@ impl Transport {
                 engines: config.engines,
                 e2ee: config.e2ee,
                 config_version: config.config_version,
+                defaults: config.defaults,
             },
             e2ee_live: config.e2ee_live,
             e2ee_ds: config.e2ee_ds,
@@ -545,6 +549,7 @@ mod tests {
             engines: Arc::default(),
             e2ee: None,
             config_version: Arc::default(),
+            defaults: Arc::default(),
             e2ee_live: None,
             e2ee_ds: None,
             read_timeout: Duration::from_mins(2),

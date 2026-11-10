@@ -1885,6 +1885,39 @@ async fn heartbeat_reports_applied_overlay_version_without_entries() {
 }
 
 // ---------------------------------------------------------------------------
+// Register and heartbeats report the runner defaults, never a key or full URL.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn register_and_heartbeats_report_runner_defaults() {
+    let host = StubHost::start(json!({ "heartbeatIntervalMs": 500 })).await;
+    let behavior = Behavior::echo_lines("sess-defaults", 1);
+    let runner = RunnerProc::spawn(&host, &behavior).await;
+    assert!(host.wait_connected(SETTLE).await, "runner never connected");
+    assert_eq!(
+        host.register_bodies().await[0]["defaults"],
+        json!({ "engine": "claude" })
+    );
+
+    host.push_config_update(json!({ "engine": {
+        "model": "m-2",
+        "anthropicBaseUrl": "https://user:secret@proxy.example:8443/llm?key=k",
+        "anthropicApiKey": "sk-hidden",
+    } }))
+    .await;
+    let expected = json!({ "engine": "claude", "model": "m-2", "baseUrlHost": "proxy.example" });
+    assert!(
+        host.wait_heartbeat_defaults(&expected, SETTLE).await,
+        "heartbeats: {:?}",
+        host.heartbeats().await
+    );
+    let seen = serde_json::to_string(&host.heartbeats().await).unwrap();
+    assert!(!seen.contains("secret") && !seen.contains("sk-hidden") && !seen.contains("8443"));
+
+    runner.shutdown().await;
+}
+
+// ---------------------------------------------------------------------------
 // A failed reconcile must not report its version as applied.
 // ---------------------------------------------------------------------------
 

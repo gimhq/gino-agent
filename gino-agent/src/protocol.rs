@@ -100,6 +100,9 @@ pub(crate) struct RegisterRequest {
     /// without e2ee.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) e2ee: Option<frames::E2eeCapability>,
+    /// The runner's engine defaults (protocol §3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) defaults: Option<frames::RunnerDefaults>,
 }
 
 /// Successful `POST /agent/register` response: the host-generated `agentId`, a
@@ -176,6 +179,7 @@ mod tests {
             version: "0.1.0".to_owned(),
             platform: "x86_64-unknown-linux-gnu".to_owned(),
             e2ee: None,
+            defaults: None,
         };
         assert!(!format!("{req:?}").contains("enroll-tok"));
         assert_eq!(
@@ -204,6 +208,7 @@ mod tests {
             version: "0.1.0".to_owned(),
             platform: "x86_64-linux".to_owned(),
             e2ee: Some(E2eeCapability::basic("AAAA".to_owned())),
+            defaults: None,
         };
         let value = serde_json::to_value(&req).unwrap();
         assert_eq!(
@@ -615,6 +620,22 @@ pub(crate) mod frames {
         /// The last host config `version` the runner applied.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub(crate) config_version: Option<i64>,
+        /// The runner's current engine defaults.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) defaults: Option<RunnerDefaults>,
+    }
+
+    /// The runner's effective engine defaults, reported on register and every
+    /// heartbeat so a host can show what an unpinned task runs with. Never a
+    /// key or a full URL: only the base URL's host.
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct RunnerDefaults {
+        pub(crate) engine: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub(crate) base_url_host: Option<String>,
     }
 
     // -----------------------------------------------------------------------
@@ -1319,6 +1340,7 @@ pub(crate) mod frames {
                         engines: Vec::new(),
                         e2ee: None,
                         config_version: None,
+                        defaults: None,
                     },
                     outbox_id: None,
                 })
@@ -1337,6 +1359,7 @@ pub(crate) mod frames {
                         engines: Vec::new(),
                         e2ee: None,
                         config_version: None,
+                        defaults: None,
                     },
                     outbox_id: Some(did(1)),
                 },
@@ -1355,6 +1378,7 @@ pub(crate) mod frames {
                     engines: Vec::new(),
                     e2ee: Some(E2eeCapability::basic("cGs".to_owned())),
                     config_version: None,
+                    defaults: None,
                 },
                 outbox_id: None,
             };
