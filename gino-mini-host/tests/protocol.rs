@@ -6,85 +6,10 @@
     reason = "test helpers: a failed setup step is a test failure"
 )]
 
-use std::sync::Arc;
-use std::time::Duration;
+mod support;
 
-use futures_util::{SinkExt, StreamExt};
-use gino_mini_host::{Config, Host, router};
-use serde_json::{Map, Value, json};
-use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-
-type Ws = WebSocketStream<MaybeTlsStream<TcpStream>>;
-
-async fn start() -> String {
-    let host: Arc<Host> = Host::open(Config {
-        register_token: "secret".into(),
-        db_path: ":memory:".into(),
-        engine: Map::new(),
-    })
-    .unwrap();
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, router(host)).await.unwrap() });
-    format!("127.0.0.1:{}", addr.port())
-}
-
-async fn register(base: &str) -> (String, String) {
-    let res = reqwest::Client::new()
-        .post(format!("http://{base}/agent/register"))
-        .json(&json!({ "registerToken": "secret", "protocolVersion": 1, "name": "t", "capabilities": ["claude"] }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(res.status(), 200);
-    let body: Value = res.json().await.unwrap();
-    assert_eq!(body["config"]["protocolVersion"], 1);
-    (
-        body["agentId"].as_str().unwrap().into(),
-        body["connectToken"].as_str().unwrap().into(),
-    )
-}
-
-async fn connect(base: &str, agent: &str, token: &str) -> Ws {
-    let mut request = format!("ws://{base}/agent/ws/{agent}")
-        .into_client_request()
-        .unwrap();
-    request
-        .headers_mut()
-        .insert("x-internal-token", token.parse().unwrap());
-    tokio_tungstenite::connect_async(request).await.unwrap().0
-}
-
-async fn recv(ws: &mut Ws) -> Value {
-    loop {
-        let message = tokio::time::timeout(Duration::from_secs(5), ws.next())
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-        if let Message::Text(text) = message {
-            return serde_json::from_str(&text).unwrap();
-        }
-    }
-}
-
-async fn send(ws: &mut Ws, frame: Value) {
-    ws.send(Message::Text(frame.to_string().into()))
-        .await
-        .unwrap();
-}
-
-async fn api(method: reqwest::Method, url: String, body: Option<Value>) -> (u16, Value) {
-    let mut req = reqwest::Client::new().request(method, url);
-    if let Some(body) = body {
-        req = req.json(&body);
-    }
-    let res = req.send().await.unwrap();
-    (res.status().as_u16(), res.json().await.unwrap())
-}
+use serde_json::json;
+use support::{api, connect, recv, register, send, start};
 
 #[tokio::test]
 async fn enrollment_rejects_bad_token_and_protocol() {

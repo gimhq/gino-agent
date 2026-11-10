@@ -3,17 +3,25 @@ name = "gino-mini-host"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99.1"
-description = "Minimal reference host for gino-agent: enrollment, dispatch and transcripts over the host-agent protocol."
+description = "Reference host for gino-agent: the whole host-agent protocol, including the byte channel, file operations, terminals and end-to-end encryption."
 license = "Apache-2.0"
 repository = "https://github.com/gimhq/gino-agent"
 publish = false
 
 [dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
+# Terminal data and the operator API's file content.
+base64 = "0.23"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+# The Delivery Service checks and the operator's client device of encrypted tasks.
+gino-e2ee = { path = "../gino-e2ee" }
+# The exact version gino-e2ee pins: the client device's randomness.
+openmls_rust_crypto = "=0.6.0"
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+# Attachment and artifact digests.
+sha2 = "0.11"
+tokio = { version = "1", features = ["macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ulid = "3"
@@ -21,6 +29,9 @@ uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["json"] }
+# Directory artifacts for the joint provisioning scenario.
+tar = { version = "0.4", default-features = false }
+tempfile = "3"
 tokio-tungstenite = "0.30"
 
 [lints.rust]

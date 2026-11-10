@@ -4,6 +4,7 @@
 //!   MINI_HOST_BIND            listen address                    (default 127.0.0.1)
 //!   MINI_HOST_REGISTER_TOKEN  enrollment secret the agent sends (default "dev")
 //!   MINI_HOST_DB              SQLite file                       (default ./mini-host.db)
+//!   MINI_HOST_HEARTBEAT_MS    heartbeatIntervalMs for agents    (default 30000)
 //!   ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_BASE_URL / MINI_HOST_MODEL
 //!                             forwarded to the agent in `config.engine`
 
@@ -11,7 +12,7 @@ use std::env;
 use std::net::IpAddr;
 use std::process::ExitCode;
 
-use gino_mini_host::{Config, Host, router};
+use gino_mini_host::{Config, HEARTBEAT_INTERVAL_MS, Host, router};
 use serde_json::{Map, Value};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
@@ -63,11 +64,18 @@ async fn run() -> Result<(), String> {
             engine.insert(key.into(), Value::String(value));
         }
     }
+    let heartbeat_interval_ms = match env::var("MINI_HOST_HEARTBEAT_MS") {
+        Ok(ms) => ms
+            .parse()
+            .map_err(|_| format!("MINI_HOST_HEARTBEAT_MS must be milliseconds, got {ms:?}"))?,
+        Err(_) => HEARTBEAT_INTERVAL_MS,
+    };
     let default_token = register_token == "dev";
     let host = Host::open(Config {
         register_token,
         db_path: db_path.clone().into(),
         engine,
+        heartbeat_interval_ms,
     })
     .map_err(|err| format!("open {db_path}: {err}"))?;
     let listener = tokio::net::TcpListener::bind((bind, port))
