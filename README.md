@@ -16,7 +16,7 @@ the end-to-end encryption core and the full wire contract. Any host that impleme
 | `gino-e2ee/` | end-to-end encryption core (Rust; MLS groups, envelopes, field maps), also built to wasm |
 | [`sdks/e2ee/`](sdks/e2ee/README.md) | `@gino/e2ee`, the only TypeScript in the repository (a standalone Bun package): the SDK over the gino-e2ee wasm build — the client helpers and, as `@gino/e2ee/ds`, the host's key directory and Delivery Service — plus the field-map generator (`scripts/gen-field-map.ts`, writes the Rust and TypeScript field maps from `docs/e2ee/*.fieldmap.json`) |
 | [`gino-vmm/`](gino-vmm/README.md), [`vm/`](vm/README.md) | the microVM launcher and the guest kernel / root image builds for `vm` isolation |
-| `gino-mini-host/` | a minimal reference host (Rust): enrollment, dispatch, transcripts, crons |
+| `gino-mini-host/` | the reference host (Rust): the whole protocol, plus the joint suite that runs the real agent against it |
 | [`skills/gino/`](skills/gino/SKILL.md) | the skill engines use to reach the agent's local CLI |
 | `docs/` | the specifications (below) |
 

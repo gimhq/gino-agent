@@ -159,7 +159,9 @@ Rules:
   `engine` (always present), `model` (`config.engine.model`, omitted when unset) and `baseUrlHost`
   (only the host of `config.engine.anthropicBaseUrl` — never the full URL, credentials, path,
   port or query; omitted when unset). It never carries a key. The same object rides on every
-  `heartbeat` (§5), recomputed after each `config_update`.
+  `heartbeat` (§5), recomputed after each `config_update`. On register it reflects only the
+  agent's local config, since the host config arrives in the response; the first heartbeat
+  carries the effective values.
 - `config.engine.isolation` (optional, additive) is the host-delivered default isolation for engine
   runs, delivered the same three ways as `config.entries`:
   `{"mode"?: "off|sandbox|vm", "network"?: {"mode"?: "none|full|allowlist", "allow"?: [rule]},
@@ -428,31 +430,14 @@ host-minted `ptyId` at the envelope top level and has no delivery ID or acknowle
   Independently detached processes are outside terminal ownership.
 - A terminal belongs to one connection: agent disconnect, replacement, host shutdown, client
   cancellation or disabling the group ends it. Reconnect never restores it or replays bytes.
-  Unknown terminal IDs and another agent's responses are ignored. Protocol version stays 2.
+  Unknown terminal IDs and another agent's responses are ignored.
 
-The Host SDK exposes `host.agents.openPty(agentId, options?, signal?)`. It resolves after
-`pty_ready` to `{id, write(Uint8Array), resize(cols, rows), close(), output, exited}`. `output`
-is a byte `ReadableStream`; `exited` resolves to the exit payload. The optional AbortSignal
-also cancels a pending open. Canceling the output stream closes the terminal.
-
-The optional Hono admin bridge (enabled by injecting `upgradeWebSocket`) uses:
-
-1. `POST /admin/agents/:id/pty-ticket`, with normal admin authorization, returns
-   `{success: true, data: {ticket, expiresAt}}`. Tickets expire in 30 seconds, are single-use,
-   are scoped to the agent, and cannot authorize any other admin route.
-2. `GET /admin/agents/:id/pty?ticket=...` upgrades the browser connection. Non-browser clients
-   may use the normal admin authorization instead. A supplied Origin must match the Origin
-   from the authenticated ticket request (or the request URL origin when absent). This works
-   through TLS termination without trusting forwarded headers. Direct admin upgrades require
-   the request URL origin. The standalone app limits tickets and upgrades to 30 requests per
-   minute per IP.
-3. Within five seconds, send `{type: "open", data: {...options}}`. Wait for
-   `{type: "ready", data: {ptyId}}`, then send `input` / `resize` / `close` using the same
-   data shapes above. The server emits `output` and `exit`. One socket owns one terminal;
-   messages do not take a client-selected ptyId. The browser's pending send buffer is bounded.
-
-Standalone paths are prefixed with `/api` (and the configured base path, when present).
-Ticket responses are not cacheable; request logs omit query strings.
+How an operator reaches a terminal is host-private. The reference host bridges one operator
+WebSocket to one terminal at `GET /api/agents/{id}/pty`: within five seconds the operator sends
+`{type: "open", data: {...options}}`, waits for `{type: "ready", data: {ptyId}}`, then sends
+`input` / `resize` / `close` with the data shapes above and receives `output` and `exit`. The
+host mints the `ptyId`; the operator never selects one. A real host also needs operator
+authentication on the upgrade (for browsers, a short-lived single-use ticket and an Origin check).
 
 ### 5.3 End-to-end encryption
 
@@ -608,8 +593,8 @@ Parse model: a whole job is `WHERE task_id = ?`; one conversation is
   dedup, retry, and watchdog are runner-local; only the `cron_state` summary is shared.
 - The `task_id ↔ delivery channel` mapping — host-private routing.
 - Storage schemas on either side — private; only the envelopes above are shared.
-- Running a command or opening a terminal on the agent without an engine — not part of
-  the protocol yet; only the file operations of §5.1 are.
+- Running a command on the agent without an engine, other than through an interactive
+  terminal (§5.2) — not part of the protocol.
 - Attachment **bytes** — only descriptors ride frames; bytes move on the separate channel
   (§2 / agent-architecture §9).
 

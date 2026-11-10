@@ -2,8 +2,10 @@
 
 The shortest path to a host that drives a `gino-agent`. [`protocol.md`](protocol.md) is the
 contract; where this guide and the contract differ, the contract wins.
-[`gino-mini-host`](../gino-mini-host/src/lib.rs) implements everything below, and §8 of the
-protocol is a JSON Schema you can validate your frames against.
+[`gino-mini-host`](../gino-mini-host/src/lib.rs) is the reference host: it implements the whole
+protocol, including file operations, terminals, provisioning and the e2ee Delivery Service, and
+its module docs map each part of the protocol to the code. §8 of the protocol is a JSON Schema
+you can validate your frames against.
 
 ## Try it
 
@@ -37,6 +39,22 @@ curl -s "$HOST/api/threads/$THREAD/wait?timeoutMs=20000" | jq .
 ```
 
 `/api/*` belongs to the mini-host, not to the protocol. Your host exposes its own operator API.
+
+To wait for the next turn on the same thread, pass the run count the message call returned:
+`/api/threads/$THREAD/wait?after=<runs>`.
+
+## The joint suite
+
+`gino-mini-host/tests/joint.rs` runs a real agent binary (with the `e2e/` fake engines) against
+the mini-host: turns and usage, both engines, engine options, replay after a restart,
+interrupt, close, attachments, crons, provisioning, every file operation, terminals and an
+encrypted task end to end. CI runs it against each release build. To run it locally:
+
+```bash
+GINO_AGENT_BIN=/path/to/gino-agent cargo test --release --test joint -- --ignored
+```
+
+or `gino-mini-host/scripts/joint-it.sh`, which builds the agent and runs the suite in a container.
 
 ## What a host must implement
 
