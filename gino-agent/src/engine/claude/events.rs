@@ -40,6 +40,9 @@ pub(super) struct EventMapper {
     reports_state: bool,
     /// The latest `result`, waiting for `idle`.
     held: Option<RunOutcome>,
+    /// An `assistant` line reported `error: "authentication_failed"` since the
+    /// last `result`.
+    auth_failed: bool,
 }
 
 impl EventMapper {
@@ -52,7 +55,23 @@ impl EventMapper {
             }
             return Vec::new();
         }
-        let events = map_line(value);
+        if value.get("type").and_then(Value::as_str) == Some("assistant")
+            && value.get("error").and_then(Value::as_str) == Some("authentication_failed")
+        {
+            self.auth_failed = true;
+        }
+        let events: Vec<EngineEvent> = map_line(value)
+            .into_iter()
+            .map(|event| match event {
+                EngineEvent::Result(mut outcome) => {
+                    if std::mem::take(&mut self.auth_failed) && outcome.status == RunStatus::Error {
+                        outcome.error_kind = Some(RunErrorKind::Auth);
+                    }
+                    EngineEvent::Result(outcome)
+                }
+                other => other,
+            })
+            .collect();
         if !self.reports_state {
             return events;
         }
@@ -269,9 +288,19 @@ fn map_result(value: &Value) -> RunOutcome {
             result: text,
             session_id,
             error,
-            error_kind: error_kind_of(subtype),
+            error_kind: auth_status(value).or_else(|| error_kind_of(subtype)),
         }
     }
+}
+
+/// [`RunErrorKind::Auth`] when a `result` carries an upstream
+/// `api_error_status` of 401 or 403.
+fn auth_status(value: &Value) -> Option<RunErrorKind> {
+    matches!(
+        value.get("api_error_status").and_then(Value::as_u64),
+        Some(401 | 403)
+    )
+    .then_some(RunErrorKind::Auth)
 }
 
 /// The structured error cause for a non-success `result.subtype`. Exact-match
@@ -714,5 +743,38 @@ mod tests {
         );
         assert!(map_line(&json!({ "type": "user", "message": {} })).is_empty());
         assert!(map_line(&json!({ "type": "stream_event" })).is_empty());
+    }
+
+    /// The CLI's structured auth signals, `assistant.error` and
+    /// `result.api_error_status`, mark the failed turn as an auth failure; the
+    /// error prose alone never does.
+    #[test]
+    fn upstream_auth_failures_map_to_the_auth_kind() {
+        let failed = json!({ "type": "result", "subtype": "success", "is_error": true,
+            "result": "Failed to authenticate. API Error: 401 {\"type\":\"error\"}" });
+        let kind = |mapper: &mut EventMapper, line: &Value| match mapper.map_line(line).as_slice() {
+            [EngineEvent::Result(outcome)] => outcome.error_kind,
+            other => panic!("expected one result, got {other:?}"),
+        };
+
+        let mut mapper = EventMapper::default();
+        assert_eq!(kind(&mut mapper, &failed), None, "prose is never matched");
+
+        mapper.map_line(
+            &json!({ "type": "assistant", "error": "authentication_failed",
+            "message": { "content": [{ "type": "text", "text": "Failed to authenticate." }] } }),
+        );
+        assert_eq!(kind(&mut mapper, &failed), Some(RunErrorKind::Auth));
+        assert_eq!(
+            kind(&mut mapper, &failed),
+            None,
+            "the flag covers one result"
+        );
+
+        let mut with_status = failed.clone();
+        with_status["api_error_status"] = json!(403);
+        assert_eq!(kind(&mut mapper, &with_status), Some(RunErrorKind::Auth));
+        with_status["api_error_status"] = json!(529);
+        assert_eq!(kind(&mut mapper, &with_status), None);
     }
 }

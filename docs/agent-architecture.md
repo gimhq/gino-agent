@@ -163,6 +163,10 @@ trigger N due / event arrives:
   `provider_network`, `process_failure`, `empty_or_unparseable_output`, `context_overflow`,
   `model_unavailable`, `missing_config`, `encryption`, `unknown`.
 
+`agent.provider_auth` comes from claude's `assistant.error: "authentication_failed"` or a `result`
+`api_error_status` of 401 or 403, and from a codex `turn.failed` whose message starts with the client's
+`unexpected status 401` / `403`.
+
 `classify(rawError)` maps free text → reason. (`invalid_request` is **`runner.*`** — a malformed/incomplete
 request is the host/runner's fault, not the provider's.) Then: **retry only `runner.*`** while
 `attempt < max_attempts` (and the thread's `prompt` snapshot, §8, makes the retry re-runnable);
