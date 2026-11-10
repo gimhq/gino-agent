@@ -40,7 +40,7 @@ use uuid::Uuid;
 
 use self::control::ControlAsk;
 use self::events::EventMapper;
-use crate::config::Config;
+use crate::config::{Config, McpServer};
 use crate::engine::{
     AgentApiAccess, Engine, EngineError, EngineEvent, EventStream, LogLevel, Session, SessionCfg,
 };
@@ -72,6 +72,10 @@ pub(crate) struct ClaudeSettings {
     pub(crate) setting_sources: Vec<String>,
     /// Turn cap passed via `--max-turns`.
     pub(crate) max_turns: Option<u32>,
+    /// Model id passed via `--fallback-model`.
+    pub(crate) fallback_model: Option<String>,
+    /// MCP servers passed inline via `--mcp-config`.
+    pub(crate) mcp_servers: Vec<McpServer>,
     /// Environment variables layered onto the child (engine credentials etc.).
     pub(crate) env: Vec<(String, String)>,
     /// The provisioned engine config dir. When set, the child is
@@ -101,6 +105,8 @@ impl Default for ClaudeSettings {
             append_system_prompt: None,
             setting_sources: vec!["user".to_owned(), "project".to_owned()],
             max_turns: None,
+            fallback_model: None,
+            mcp_servers: Vec::new(),
             env: Vec::new(),
             config_dir: None,
             isolation: IsolationSpec::default(),
@@ -136,6 +142,7 @@ impl ClaudeSettings {
         if let Some(url) = &engine.anthropic_base_url {
             env.push(("ANTHROPIC_BASE_URL".to_owned(), url.clone()));
         }
+        env.extend(engine.env.iter().cloned());
         Self {
             binary: super::admin::resolve_binary(
                 &config.paths.workspace_dir,
@@ -145,6 +152,9 @@ impl ClaudeSettings {
             self_exe: std::env::current_exe().ok(),
             model: engine.model.clone(),
             allowed_tools: engine.allowed_tools.clone(),
+            max_turns: engine.max_turns,
+            fallback_model: engine.fallback_model.clone(),
+            mcp_servers: engine.mcp_servers.clone(),
             env,
             isolation: engine.isolation.clone(),
             isolation_floored: engine.isolation_floor.is_some(),
@@ -228,6 +238,10 @@ fn build_args(settings: &ClaudeSettings, session_args: &SessionArgs) -> Vec<Stri
         argv.push("--model".to_owned());
         argv.push(model.clone());
     }
+    if let Some(model) = &settings.fallback_model {
+        argv.push("--fallback-model".to_owned());
+        argv.push(model.clone());
+    }
 
     match &session_args.session {
         SessionId::New(id) => {
@@ -259,6 +273,12 @@ fn build_args(settings: &ClaudeSettings, session_args: &SessionArgs) -> Vec<Stri
         argv.push(settings.setting_sources.join(","));
     }
 
+    // `--mcp-config` is variadic; the `--settings` flag after it ends the list.
+    if !settings.mcp_servers.is_empty() {
+        argv.push("--mcp-config".to_owned());
+        argv.push(mcp_config_json(&settings.mcp_servers));
+    }
+
     argv.push("--settings".to_owned());
     argv.push(launch_settings_json(settings, session_args));
 
@@ -275,6 +295,24 @@ fn build_args(settings: &ClaudeSettings, session_args: &SessionArgs) -> Vec<Stri
     }
 
     argv
+}
+
+/// The inline `--mcp-config` JSON: `{"mcpServers": {<name>: {command, args,
+/// env} | {type: "http", url}}}`.
+fn mcp_config_json(servers: &[McpServer]) -> String {
+    let servers: serde_json::Map<String, Value> = servers
+        .iter()
+        .map(|server| {
+            let config = match (&server.command, &server.url) {
+                (Some(command), _) => {
+                    json!({ "command": command, "args": server.args, "env": server.env })
+                }
+                (None, url) => json!({ "type": "http", "url": url }),
+            };
+            (server.name.clone(), config)
+        })
+        .collect();
+    json!({ "mcpServers": servers }).to_string()
 }
 
 /// The config-dir environment the child inherits: the provisioned
@@ -812,6 +850,55 @@ mod tests {
     use crate::memory::AgentMemoryAccess;
     use crate::sandbox::{self, IsolationSpec, Launch, SandboxHost};
     use serde_json::json;
+
+    #[test]
+    fn from_config_carries_the_host_engine_options() {
+        let mut config = Config::default();
+        config.apply(
+            ConfigOverlay::from_json(
+                r#"{"engine":{"fallbackModel":"m-fallback","maxTurns":12,
+                "env":{"FOO":"1","ANTHROPIC_API_KEY":"x"},
+                "mcpServers":[{"name":"fs","command":"mcp-fs","args":["/data"],"env":{"TOKEN":"t"}},
+                {"name":"web","url":"https://mcp.example/mcp"}]}}"#,
+            )
+            .unwrap(),
+        );
+        let settings = ClaudeSettings::from_config(&config);
+        assert!(settings.env.contains(&("FOO".to_owned(), "1".to_owned())));
+        assert!(
+            !settings
+                .env
+                .iter()
+                .any(|(key, _)| key == "ANTHROPIC_API_KEY")
+        );
+
+        let argv = build_args(&settings, &args_with(SessionId::New("s".to_owned())));
+        let value_of = |flag: &str| &argv[argv.iter().position(|a| a == flag).unwrap() + 1];
+        assert_eq!(value_of("--fallback-model"), "m-fallback");
+        assert_eq!(value_of("--max-turns"), "12");
+        let at = argv.iter().position(|a| a == "--mcp-config").unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&argv[at + 1]).unwrap(),
+            json!({ "mcpServers": {
+                "fs": { "command": "mcp-fs", "args": ["/data"], "env": { "TOKEN": "t" } },
+                "web": { "type": "http", "url": "https://mcp.example/mcp" }
+            } })
+        );
+        assert!(
+            argv[at + 2].starts_with("--"),
+            "the variadic flag ends at the next flag"
+        );
+
+        let none = build_args(
+            &ClaudeSettings::default(),
+            &args_with(SessionId::New("s".to_owned())),
+        );
+        assert!(
+            !none
+                .iter()
+                .any(|a| a == "--mcp-config" || a == "--fallback-model" || a == "--max-turns")
+        );
+    }
 
     #[test]
     fn from_config_prefers_the_managed_install_and_disables_self_updates() {

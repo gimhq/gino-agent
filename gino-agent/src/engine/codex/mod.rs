@@ -39,7 +39,7 @@ use tokio::task::JoinHandle;
 use tracing::{debug, warn};
 
 use self::events::EventMapper;
-use crate::config::Config;
+use crate::config::{Config, McpServer};
 use crate::engine::{Engine, EngineError, EngineEvent, EventStream, LogLevel, Session, SessionCfg};
 use crate::memory::{self, AgentMemoryAccess};
 use crate::sandbox::vm::VmMonitor;
@@ -103,6 +103,8 @@ pub(crate) struct CodexSettings {
     pub(crate) workspace_dir: PathBuf,
     /// Soft size cap for the task memory dir.
     pub(crate) memory_max_bytes: u64,
+    /// MCP servers passed as `-c mcp_servers.<name>.*` overrides.
+    pub(crate) mcp_servers: Vec<McpServer>,
 }
 
 impl Default for CodexSettings {
@@ -122,6 +124,7 @@ impl Default for CodexSettings {
             isolation_floored: false,
             workspace_dir: PathBuf::new(),
             memory_max_bytes: memory::DEFAULT_MAX_BYTES,
+            mcp_servers: Vec::new(),
         }
     }
 }
@@ -141,6 +144,7 @@ impl CodexSettings {
         if let Some(key) = &codex.openai_api_key {
             env.push(("CODEX_API_KEY".to_owned(), key.expose_secret().to_owned()));
         }
+        env.extend(config.engine.env.iter().cloned());
         Self {
             binary: super::admin::resolve_binary(
                 &config.paths.workspace_dir,
@@ -162,6 +166,7 @@ impl CodexSettings {
             isolation_floored: config.engine.isolation_floor.is_some(),
             workspace_dir: config.paths.workspace_dir.clone(),
             memory_max_bytes: config.memory.max_bytes,
+            mcp_servers: config.engine.mcp_servers.clone(),
         }
     }
 }
@@ -240,6 +245,10 @@ fn build_args(settings: &CodexSettings, resume: Option<&str>) -> Vec<String> {
             serde_json::Value::from(url.as_str())
         ));
     }
+    for (key, value) in mcp_overrides(&settings.mcp_servers) {
+        argv.push("-c".to_owned());
+        argv.push(format!("{key}={value}"));
+    }
     argv.extend(settings.extra_args.iter().cloned());
     if let Some(thread_id) = resume {
         argv.push("resume".to_owned());
@@ -247,6 +256,33 @@ fn build_args(settings: &CodexSettings, resume: Option<&str>) -> Vec<String> {
     }
 
     argv
+}
+
+/// The `-c` overrides declaring `servers` in codex's `mcp_servers` table, as
+/// `(key, TOML value)` pairs. Names are already `[A-Za-z0-9_-]` (bare TOML
+/// keys); strings use JSON quoting, which TOML basic strings accept.
+fn mcp_overrides(servers: &[McpServer]) -> Vec<(String, String)> {
+    let quote = |value: &str| Value::from(value).to_string();
+    let mut overrides = Vec::new();
+    for server in servers {
+        let key = |field: &str| format!("mcp_servers.{}.{field}", server.name);
+        if let Some(command) = &server.command {
+            overrides.push((key("command"), quote(command)));
+            let args: Vec<String> = server.args.iter().map(|arg| quote(arg)).collect();
+            overrides.push((key("args"), format!("[{}]", args.join(", "))));
+            if !server.env.is_empty() {
+                let env: Vec<String> = server
+                    .env
+                    .iter()
+                    .map(|(name, value)| format!("{} = {}", quote(name), quote(value)))
+                    .collect();
+                overrides.push((key("env"), format!("{{{}}}", env.join(", "))));
+            }
+        } else if let Some(url) = &server.url {
+            overrides.push((key("url"), quote(url)));
+        }
+    }
+    overrides
 }
 
 /// The config-dir environment the child inherits: the provisioned engine config
@@ -699,6 +735,36 @@ mod tests {
 
     fn os_args(args: Vec<String>) -> Vec<std::ffi::OsString> {
         args.into_iter().map(Into::into).collect()
+    }
+
+    #[test]
+    fn host_env_and_mcp_servers_reach_the_codex_child() {
+        let mut config = Config::default();
+        config.apply(
+            ConfigOverlay::from_json(
+                r#"{"engine":{"env":{"FOO":"1"},"mcpServers":[
+                {"name":"fs","command":"mcp \"fs\"","args":["/data","-v"],"env":{"TOKEN":"t"}},
+                {"name":"web","url":"https://mcp.example/mcp"}]}}"#,
+            )
+            .unwrap(),
+        );
+        let settings = CodexSettings::from_config(&config);
+        assert!(settings.env.contains(&("FOO".to_owned(), "1".to_owned())));
+        let argv = build_args(&settings, None);
+        let overrides: Vec<&str> = argv
+            .windows(2)
+            .filter(|pair| pair[0] == "-c")
+            .map(|pair| pair[1].as_str())
+            .collect();
+        assert_eq!(
+            overrides,
+            [
+                r#"mcp_servers.fs.command="mcp \"fs\"""#,
+                r#"mcp_servers.fs.args=["/data", "-v"]"#,
+                r#"mcp_servers.fs.env={"TOKEN" = "t"}"#,
+                r#"mcp_servers.web.url="https://mcp.example/mcp""#,
+            ]
+        );
     }
 
     #[test]

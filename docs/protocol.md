@@ -93,6 +93,35 @@ watchdog. Only the keys an operator set are present (`{}` when none); an absent 
 agent's default. It is delivered on register and `GET /agent/config/:agentId`, and pushed as
 `config_update { "executor": {...} }` when an operator changes it. The agent reads the limits
 when it builds its executor, so a change takes effect at the agent's next start.
+`config.engine` carries host-set engine options, delivered the same three ways; the next engine
+spawn uses them, and `null` on any of them clears it back to the agent's own value:
+
+- `fallbackModel` (string): claude `--fallback-model`, the model claude switches to when the main
+  one is overloaded. Ignored by codex.
+- `maxTurns` (positive integer): claude `--max-turns`, the turn cap of one run; hitting it ends the
+  run as `runner.iteration_limit`. `0` is ignored. Ignored by codex.
+- `env` (object of string → string): extra environment for the engine process (claude and codex).
+  Like every object in the host layer it merges key by key, so `null` on one key removes it and
+  `"env": null` removes them all. Values are not secrets by contract (use the credential fields
+  for those). The agent enforces a deny list, matched case-insensitively: any `ANTHROPIC_*`,
+  `OPENAI_*`, `GINO_*`, `LD_*`, `DYLD_*` or `NODE_*` key, any `*_PROXY` key, `CODEX_API_KEY`,
+  `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CONFIG_DIR`, `ENGINE_CONFIG_DIR`, `CODEX_HOME`, `HOME`,
+  `PATH`, `TMPDIR`, `SHELL`, `USER`, `LOGNAME`, `BASH_ENV`, `ENV`, `IFS`, `GCONV_PATH`,
+  `SSL_CERT_FILE`, `SSL_CERT_DIR`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `DISABLE_AUTOUPDATER`,
+  `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY`, and any key that is
+  empty or contains `=` or NUL (or whose value contains NUL). A denied key is dropped and logged,
+  never applied; the rest of the object still applies.
+- `mcpServers` (array): MCP servers for claude and codex runs; an array replaces the previous
+  list. Each item is `{"name": "<[A-Za-z0-9_-]+>", "command": "<exe>", "args"?: [string],
+  "env"?: {string: string}}` (stdio) or `{"name": "...", "url": "<https://...>"}` (streamable
+  HTTP). An item needs exactly one of `command` / `url` and a unique name; anything else is
+  dropped and logged. `env` keys follow the `env` deny list. Claude gets them as one inline
+  `--mcp-config '{"mcpServers": {...}}'` (`url` items as `{"type": "http", "url"}`); codex gets
+  `-c mcp_servers.<name>.{command, args, env | url}=<TOML>` overrides. The engine process starts
+  (or, for `url`, reaches) the servers itself, so they run inside the run's isolation and network
+  mode: under `network.mode: none` a `url` server is unreachable, and under `allowlist` its host
+  must be on the allowlist.
+
 Response (failure): `{ "register_error": { "reason": "invalid_register_token | rate_limited | invalid_body | registration_disabled | unsupported_protocol" } }`.
 
 Rules:

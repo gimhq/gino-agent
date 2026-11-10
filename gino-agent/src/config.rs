@@ -25,6 +25,7 @@
 //! they are redacted in `Debug`/log output and never echoed. Overlays carry the
 //! raw strings only transiently and are deliberately not `Debug`-printable.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use secrecy::SecretString;
@@ -250,6 +251,14 @@ pub(crate) struct EngineConfig {
     pub(crate) model: Option<String>,
     /// Tools the engine is permitted to use.
     pub(crate) allowed_tools: Vec<String>,
+    /// Model claude falls back to when the main one is overloaded (`--fallback-model`).
+    pub(crate) fallback_model: Option<String>,
+    /// Turn cap of one claude run (`--max-turns`).
+    pub(crate) max_turns: Option<u32>,
+    /// Extra engine environment (`engine.env`), denied keys already dropped.
+    pub(crate) env: Vec<(String, String)>,
+    /// MCP servers handed to the engine (`engine.mcpServers`), invalid ones already dropped.
+    pub(crate) mcp_servers: Vec<McpServer>,
     /// Settings for the `codex` backend, namespaced under `engine.codex`.
     pub(crate) codex: CodexConfig,
     /// Default engine isolation (`engine.isolation`); empty means off.
@@ -257,6 +266,22 @@ pub(crate) struct EngineConfig {
     /// Local isolation floor from `GINO_ISOLATION_FILE`; host blocks may only
     /// tighten it.
     pub(crate) isolation_floor: Option<IsolationSpec>,
+}
+
+/// One `engine.mcpServers` item: a stdio `command` (with `args` and `env`) or
+/// a streamable HTTP `url`.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct McpServer {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) command: Option<String>,
+    #[serde(default)]
+    pub(crate) url: Option<String>,
+    #[serde(default)]
+    pub(crate) args: Vec<String>,
+    #[serde(default)]
+    pub(crate) env: BTreeMap<String, String>,
 }
 
 /// Settings for the `codex` backend (`engine.codex`).
@@ -460,6 +485,10 @@ impl Config {
             anthropic_base_url,
             model,
             allowed_tools,
+            fallback_model,
+            max_turns,
+            env,
+            mcp_servers,
             codex,
             isolation,
         } = engine;
@@ -472,6 +501,17 @@ impl Config {
         overlay_field(&mut self.engine.model, model);
         if let Some(tools) = allowed_tools {
             self.engine.allowed_tools = tools;
+        }
+        overlay_field(&mut self.engine.fallback_model, fallback_model);
+        overlay_field(
+            &mut self.engine.max_turns,
+            max_turns.filter(|turns| *turns > 0),
+        );
+        if let Some(env) = env {
+            self.engine.env = allowed_env(env);
+        }
+        if let Some(servers) = mcp_servers {
+            self.engine.mcp_servers = allowed_mcp_servers(servers);
         }
 
         apply_codex_overlay(&mut self.engine.codex, codex);
@@ -799,6 +839,10 @@ struct EngineOverlay {
     anthropic_base_url: Option<String>,
     model: Option<String>,
     allowed_tools: Option<Vec<String>>,
+    fallback_model: Option<String>,
+    max_turns: Option<u32>,
+    env: Option<BTreeMap<String, String>>,
+    mcp_servers: Option<Vec<McpServer>>,
     codex: CodexOverlay,
     isolation: Option<IsolationSpec>,
 }
@@ -1120,6 +1164,95 @@ fn apply_codex_overlay(config: &mut CodexConfig, overlay: CodexOverlay) {
 }
 
 /// Overwrite `dst` with `src` only when the overlay actually carries a value.
+/// Env keys a host may never set through `engine.env` or an MCP server's env:
+/// credentials, the engine config dirs, the runner's own variables and the
+/// process basics the runner and the sandbox rely on.
+const DENIED_ENV_KEYS: &[&str] = &[
+    "CODEX_API_KEY",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CONFIG_DIR",
+    "ENGINE_CONFIG_DIR",
+    "CODEX_HOME",
+    "HOME",
+    "PATH",
+    "TMPDIR",
+    "SHELL",
+    "USER",
+    "LOGNAME",
+    "BASH_ENV",
+    "ENV",
+    "IFS",
+    "GCONV_PATH",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+    "CURL_CA_BUNDLE",
+    "DISABLE_AUTOUPDATER",
+    "CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY",
+];
+
+/// Env key prefixes denied like [`DENIED_ENV_KEYS`].
+const DENIED_ENV_PREFIXES: &[&str] = &["ANTHROPIC_", "OPENAI_", "GINO_", "LD_", "DYLD_", "NODE_"];
+
+/// Whether a host may set env `key` for the engine. Matching is
+/// case-insensitive; proxy settings (`*_PROXY`) are denied too, so the engine's
+/// network path, loader, runtime and TLS trust stay the runner's, and a key
+/// that is empty or holds `=` or NUL is refused.
+fn env_key_allowed(key: &str) -> bool {
+    let upper = key.to_ascii_uppercase();
+    !key.is_empty()
+        && !key.contains(['=', '\0'])
+        && !DENIED_ENV_KEYS.contains(&upper.as_str())
+        && !upper.ends_with("_PROXY")
+        && !DENIED_ENV_PREFIXES
+            .iter()
+            .any(|prefix| upper.starts_with(prefix))
+}
+
+/// The `engine.env` entries a host may set; a denied key is dropped and
+/// logged, never applied. A value holding NUL cannot be exported and is dropped too.
+fn allowed_env(env: BTreeMap<String, String>) -> Vec<(String, String)> {
+    env.into_iter()
+        .filter(|(key, value)| {
+            let allowed = env_key_allowed(key) && !value.contains('\0');
+            if !allowed {
+                warn!(key = %key, "ignoring host engine.env key: denied for the engine environment");
+            }
+            allowed
+        })
+        .collect()
+}
+
+/// The `engine.mcpServers` a runner can render: a name of `[A-Za-z0-9_-]`,
+/// exactly one of `command` / `url`, and no duplicate names. Invalid servers are
+/// dropped and logged; denied env keys are dropped from the rest.
+fn allowed_mcp_servers(servers: Vec<McpServer>) -> Vec<McpServer> {
+    let mut seen = BTreeSet::new();
+    servers
+        .into_iter()
+        .filter_map(|mut server| {
+            let named = !server.name.is_empty()
+                && server
+                    .name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+            if !named || server.command.is_some() == server.url.is_some() {
+                warn!(name = %server.name, "ignoring host engine.mcpServers entry: needs a [A-Za-z0-9_-] name and exactly one of command or url");
+                return None;
+            }
+            if !seen.insert(server.name.clone()) {
+                warn!(name = %server.name, "ignoring duplicate host engine.mcpServers entry");
+                return None;
+            }
+            server.env = allowed_env(std::mem::take(&mut server.env))
+                .into_iter()
+                .collect();
+            Some(server)
+        })
+        .collect()
+}
+
 fn overlay_field<T>(dst: &mut Option<T>, src: Option<T>) {
     if let Some(value) = src {
         *dst = Some(value);
@@ -1731,6 +1864,92 @@ mod tests {
         // The host re-pushes the full desired set: an explicit `[]` replaces to empty.
         config.apply(ConfigOverlay::from_json(r#"{ "entries": [] }"#).unwrap());
         assert!(config.entries.as_ref().unwrap().is_empty());
+    }
+
+    #[test]
+    fn host_engine_options_apply_and_clear_with_null() {
+        let mut layered = LayeredConfig::new(Config::default());
+        let config = layered
+            .update(&json!({ "engine": {
+                "fallbackModel": "m-fallback",
+                "maxTurns": 12,
+                "env": { "FOO": "1" },
+                "mcpServers": [{ "name": "web", "url": "https://mcp.example/mcp" }],
+            } }))
+            .unwrap();
+        assert_eq!(config.engine.fallback_model.as_deref(), Some("m-fallback"));
+        assert_eq!(config.engine.max_turns, Some(12));
+        assert_eq!(config.engine.env, [("FOO".to_owned(), "1".to_owned())]);
+        assert_eq!(config.engine.mcp_servers.len(), 1);
+
+        let config = layered
+            .update(&json!({ "engine": {
+                "fallbackModel": null, "maxTurns": null, "env": null, "mcpServers": null,
+            } }))
+            .unwrap();
+        assert_eq!(config.engine.fallback_model, None);
+        assert_eq!(config.engine.max_turns, None);
+        assert!(config.engine.env.is_empty());
+        assert!(config.engine.mcp_servers.is_empty());
+
+        let config = layered
+            .update(&json!({ "engine": { "maxTurns": 0 } }))
+            .unwrap();
+        assert_eq!(config.engine.max_turns, None, "a zero turn cap is ignored");
+    }
+
+    #[test]
+    fn host_engine_env_drops_denied_keys() {
+        let mut config = Config::default();
+        config.apply(
+            ConfigOverlay::from_json(
+                r#"{"engine":{"env":{"FOO":"1","ANTHROPIC_API_KEY":"x","openai_base_url":"y",
+                "PATH":"/evil","GINO_TASK_ID":"t","CODEX_HOME":"/h","HOME":"/h","LD_PRELOAD":"p",
+                "CLAUDE_CONFIG_DIR":"/c","CLAUDE_CODE_OAUTH_TOKEN":"t","https_proxy":"p",
+                "codex_api_key":"k","NODE_OPTIONS":"--require x","node_tls_reject_unauthorized":"0",
+                "BASH_ENV":"/x","A=B":"c","NUL":"a\u0000b","BAR":"2"}}}"#,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            config.engine.env,
+            [
+                ("BAR".to_owned(), "2".to_owned()),
+                ("FOO".to_owned(), "1".to_owned())
+            ]
+        );
+    }
+
+    #[test]
+    fn host_mcp_servers_keep_only_renderable_entries() {
+        let mut config = Config::default();
+        config.apply(
+            ConfigOverlay::from_json(
+                r#"{"engine":{"mcpServers":[
+                {"name":"fs","command":"mcp-fs","args":["/data"],"env":{"TOKEN":"t","PATH":"/x"}},
+                {"name":"web","url":"https://mcp.example/sse"},
+                {"name":"bad name","command":"x"},
+                {"name":"both","command":"x","url":"https://y"},
+                {"name":"neither"},
+                {"name":"fs","command":"dup"}]}}"#,
+            )
+            .unwrap(),
+        );
+        let servers = &config.engine.mcp_servers;
+        assert_eq!(
+            servers.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            ["fs", "web"]
+        );
+        assert_eq!(servers[0].args, ["/data"]);
+        assert_eq!(
+            servers[0]
+                .env
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["TOKEN"],
+            "a denied env key is dropped"
+        );
     }
 
     #[test]
