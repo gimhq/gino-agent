@@ -142,3 +142,44 @@ openmls 0.9.2, current GitHub Actions majors and @antfu/eslint-config 10. Held b
 and aes-gcm (openmls_rust_crypto 0.6 needs the current majors), bzip2 (libkrun needs 0.5) and
 TypeScript 7 (typescript-eslint does not support it).
 Verification: clippy, tests, deny per crate; `sandbox-it.sh` (17 passed); `vm-it.sh`; wasm drift check.
+
+## 2026-11-10 16:00 [progress]
+
+Agent 0.3.0, the runner settings a host needs to drive both engines. Protocol additions (all
+optional and additive; `protocolVersion` stays 1):
+- `config.engine.fallbackModel`, `maxTurns`, `env` and `mcpServers`, each cleared with `null`.
+  `env` and MCP server env drop a deny list of credential, loader, proxy and runner keys
+  (`CODEX_API_KEY` included). MCP servers reach claude as `--mcp-config` and codex as
+  `-c mcp_servers.<name>.*`.
+- `task_upsert.engine` / `model` accept `null`, which clears them back to the agent default.
+- `thread_result.engine`, `model` and `usage` (`inputTokens`, `outputTokens`,
+  `cacheReadTokens?`, `costUsd?`).
+- `defaults {engine, model?, baseUrlHost?}` on register and every heartbeat, recomputed after
+  `config_update`; it never carries a key or a full URL.
+- `fs_request` `put` and `rename` take `exclusive: true`: put links into place with `link(2)`,
+  rename uses `RENAME_NOREPLACE` (link + unlink for regular files where the filesystem lacks
+  it). Anything at the destination, a dangling symlink included, answers `exists`.
+Claude authentication failures (`authentication_failed`, API status 401/403) now classify as
+`agent.provider_auth`, like codex. Codex runs get a per-thread `CODEX_HOME` whose `skills/`
+holds the global and task-scope skills. The §8 schema covers every new field, and the e2e fakes
+take the new flags and report usage.
+Verification: gino-agent gates (nextest 991 passed), sandbox-it (17 passed) and vm-it (20 passed)
+in the bubblewrap image, the §8 schema test, and the joint suite below.
+
+## 2026-11-10 19:30 [progress]
+
+`gino-mini-host` becomes the reference host: it implements the whole protocol, and other hosts
+build on it. New: the attachment byte channel in both directions (single-use inbound blobs,
+verified uploads), provisioning artifacts and `entries` validation, config as an RFC 7386 merge
+patch with a monotonic `version`, `close`, interrupt, crons, file operations
+(`POST /api/agents/{id}/fs`), terminals (an operator WebSocket at `/api/agents/{id}/pty`), and
+end-to-end encryption: the key directory with pinning and KeyPackage verification, the
+Delivery Service (`log`, `log_from_epoch`, `link`, `put_link`, `commit`), an operator client
+device that creates the group and seals and opens task content, and refusal of plaintext on an
+encrypted task. `wait?after=<runs>` waits for the next turn on a thread.
+A joint suite (`tests/joint.rs`, 13 scenarios) runs the real agent binary against it with the
+`e2e/` fake engines; CI runs it against the static release build, and
+`scripts/joint-it.sh` runs it locally in a container. Protocol §5.2 now describes the operator
+side of a terminal as host-private, with the mini-host as the example.
+Verification: mini-host gates (nextest 10 passed, clippy, deny, shear), joint suite 13/13
+against gino-agent 0.3.0.
