@@ -281,10 +281,8 @@ fn log_env(joint: &Joint) -> Value {
 #[tokio::test]
 #[ignore = "needs GINO_AGENT_BIN"]
 async fn a_turn_reports_its_transcript_usage_and_the_runner_defaults() {
-    let joint = Joint::start(
-        json!({ "model": "m-default", "anthropicBaseUrl": "https://u:p@proxy.example:8443/x" }),
-    )
-    .await;
+    let url = "https://u:p@proxy.example:8443/x"; // trufflehog:ignore
+    let joint = Joint::start(json!({ "model": "m-default", "anthropicBaseUrl": url })).await;
 
     let agent = joint.agent().await;
     let capabilities = agent["capabilities"].as_array().unwrap();

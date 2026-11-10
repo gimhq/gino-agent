@@ -1901,7 +1901,7 @@ async fn register_and_heartbeats_report_runner_defaults() {
 
     host.push_config_update(json!({ "engine": {
         "model": "m-2",
-        "anthropicBaseUrl": "https://user:secret@proxy.example:8443/llm?key=k",
+        "anthropicBaseUrl": "https://user:secret@proxy.example:8443/llm?key=k", // trufflehog:ignore
         "anthropicApiKey": "sk-hidden",
     } }))
     .await;

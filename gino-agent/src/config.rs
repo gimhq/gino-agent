@@ -1965,11 +1965,11 @@ mod tests {
                 base_url_host: None
             }
         );
+        let url = "https://user:secret@proxy.example:8443/llm?key=k"; // trufflehog:ignore
         config.apply(
-            ConfigOverlay::from_json(
-                r#"{ "engine": { "model": "m-1",
-                    "anthropicBaseUrl": "https://user:secret@proxy.example:8443/llm?key=k" } }"#,
-            )
+            ConfigOverlay::from_json(&format!(
+                r#"{{ "engine": {{ "model": "m-1", "anthropicBaseUrl": "{url}" }} }}"#
+            ))
             .unwrap(),
         );
         let defaults = config.runner_defaults();
