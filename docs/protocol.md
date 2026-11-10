@@ -245,7 +245,7 @@ agent-architecture); bytes never travel in frames.
 | `interrupt` | `taskId?` | — | graceful cancel of the current turn (engine stays alive); with `taskId`, scoped: the agent interrupts only if that task owns the in-flight turn. Delivery is LIVE-ONLY (at-most-once): the host sends it to an online agent and never replays it on reconnect — a stale cancel must not fire against a future turn |
 | `close` | — | `{reason?}` (`stop\|restart\|remove`) | runner-level wind-down and exit (agent removal / launcher stop), **not** per-task close — per-task close = `task_upsert{status:"closed"}` + scoped `interrupt` |
 | `config_update` | — | `{entries, version, <config fields>}` | live config change (a merge patch over the §3 host config, `null` removes a key; `data` is required — `version` is reported by `heartbeat.configVersion`, and `entries` + `version` together drive the version-gated reconcile) |
-| `fs_request` | `reqId` | `{op, path, to?, recursive?, ref? + sha256? + size?, upload?}` | one engine-free file operation; live-only (never queued, never replayed) |
+| `fs_request` | `reqId` | `{op, path, to?, recursive?, exclusive?, ref? + sha256? + size?, upload?}` | one engine-free file operation; live-only (never queued, never replayed) |
 | `e2ee_key_package_status` | (top-level `id?`) | `{one_time, last_resort, rejected?}` | the runner's KeyPackage pool at the host (§5.3); live-only |
 | `e2ee_log` | `taskId` | `{seq, kind, epoch, message, drop_public_key?}` | one handshake log entry of the task's group (§5.3) |
 | `e2ee_welcome` | `taskId` | `{welcome, seq}` | a Welcome adding the runner to the task's group (§5.3) |
@@ -351,6 +351,13 @@ The host can operate on an agent's files directly, without prompting an engine.
     the sha256, and renames it into place, so the destination is replaced atomically or not
     at all. The parent directory must exist. An existing destination keeps its permission
     bits, and a symlink is written through to its target.
+  - `put {…, exclusive: true}` — create only if absent: after the download and digest check
+    the temporary file is linked into place with a no-replace primitive (`link(2)`), never
+    check-then-rename, so of concurrent exclusive puts to one path exactly one succeeds and
+    the rest answer `exists`. Anything already at `path` — file, directory or symlink, even
+    a dangling one — answers `exists` and is left untouched; nothing is written through.
+    The new file is a regular file with the default mode. Absent or `false` is the
+    replacing `put` above.
   - `get {path, upload}` — the agent uploads the file with `POST /agent/attachments` under
     the name `upload` and answers `{ok, sha256, size}`; the host reads the bytes back by
     that name and digest. `path` must be a regular file.
@@ -359,6 +366,13 @@ The host can operate on an agent's files directly, without prompting an engine.
     settles. Only the host mints `ref` and `upload`; a caller cannot supply them.
   - A file larger than the agent's single-attachment limit is refused with `too_large`
     before any bytes move; the host additionally caps what it accepts for a `put`.
+- `rename {path, to}` replaces a file at `to` like `rename(2)`. With `exclusive: true` it
+  moves only if nothing — file, directory or symlink, even a dangling one — sits at `to`,
+  and answers `exists` otherwise, leaving both untouched. The agent uses
+  `renameat2(RENAME_NOREPLACE)`, so of concurrent exclusive renames to one path exactly one
+  succeeds. On a filesystem without that flag a regular file moves by `link(2)` + `unlink`
+  (same guarantee) and anything else answers `invalid`.
+- `exclusive` applies to `put` and `rename`; the other ops ignore it.
 - `recursive` lets `mkdir` create parents and `remove` delete a non-empty directory.
   `remove` on a symlink removes the link, never its target.
 - `list` returns `entries: [{name, type, size, mtime_ms?}]` sorted by name; `stat` returns
@@ -1932,6 +1946,9 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                   "minLength": 1
                 },
                 "recursive": {
+                  "type": "boolean"
+                },
+                "exclusive": {
                   "type": "boolean"
                 },
                 "ref": {
@@ -3722,6 +3739,9 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                   "minLength": 1
                 },
                 "recursive": {
+                  "type": "boolean"
+                },
+                "exclusive": {
                   "type": "boolean"
                 },
                 "ref": {

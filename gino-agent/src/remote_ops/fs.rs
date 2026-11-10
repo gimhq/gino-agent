@@ -9,6 +9,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
+use rustix::fs::{CWD, RenameFlags, renameat_with};
+use rustix::io::Errno;
 use serde::{Deserialize, Serialize};
 
 use crate::attachments::AttachmentError;
@@ -24,12 +26,16 @@ pub(crate) enum FsRequest {
         path: PathBuf,
     },
     /// Download the blob at `ref` from the byte channel into `path`.
+    /// `exclusive` creates `path` only if nothing exists there; other ops
+    /// ignore the field.
     Put {
         path: PathBuf,
         #[serde(rename = "ref")]
         reference: String,
         sha256: String,
         size: u64,
+        #[serde(default)]
+        exclusive: bool,
     },
     /// Upload the file at `path` to the byte channel under the name `upload`.
     Get {
@@ -46,9 +52,12 @@ pub(crate) enum FsRequest {
         #[serde(default)]
         recursive: bool,
     },
+    /// `exclusive` moves only if nothing exists at `to`.
     Rename {
         path: PathBuf,
         to: PathBuf,
+        #[serde(default)]
+        exclusive: bool,
     },
 }
 
@@ -190,11 +199,46 @@ pub(crate) fn execute(workspace_dir: &Path, request: FsRequest) -> Result<FsOutp
             Ok(FsOutput::default())
         }
         FsRequest::Remove { path, recursive } => remove(&at(&path), recursive),
-        FsRequest::Rename { path, to } => {
-            fs::rename(at(&path), at(&to))?;
+        FsRequest::Rename {
+            path,
+            to,
+            exclusive,
+        } => {
+            if exclusive {
+                rename_exclusive(&at(&path), &at(&to))?;
+            } else {
+                fs::rename(at(&path), at(&to))?;
+            }
             Ok(FsOutput::default())
         }
     }
+}
+
+/// Move `from` to `to` only if nothing, not even a dangling symlink, sits at
+/// `to`: `renameat2(RENAME_NOREPLACE)`, so of concurrent exclusive renames to
+/// one path exactly one wins. A filesystem without the flag answers `EINVAL`;
+/// a regular file then moves by `link(2)` + `unlink`, which never replaces
+/// either, and anything else is refused as `invalid`.
+fn rename_exclusive(from: &Path, to: &Path) -> Result<(), FsError> {
+    match renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE) {
+        Ok(()) => Ok(()),
+        Err(Errno::INVAL) => link_rename(from, to),
+        Err(errno) => Err(io::Error::from(errno).into()),
+    }
+}
+
+/// The exclusive move of [`rename_exclusive`] where `RENAME_NOREPLACE` is
+/// unsupported: regular files only.
+fn link_rename(from: &Path, to: &Path) -> Result<(), FsError> {
+    if !fs::symlink_metadata(from)?.is_file() {
+        return Err(FsError::new(
+            ErrorCode::Invalid,
+            "exclusive rename of a non-regular file is unsupported on this filesystem",
+        ));
+    }
+    fs::hard_link(from, to)?;
+    fs::remove_file(from)?;
+    Ok(())
 }
 
 fn list(path: &Path) -> Result<FsOutput, FsError> {
@@ -229,13 +273,117 @@ fn remove(path: &Path, recursive: bool) -> Result<FsOutput, FsError> {
 mod tests {
     use serde_json::{Value, json};
 
-    use super::{ErrorCode, FsRequest, execute};
+    use super::{ErrorCode, FsRequest, execute, link_rename};
 
     fn run(dir: &std::path::Path, request: Value) -> Result<Value, ErrorCode> {
         let request: FsRequest = serde_json::from_value(request).unwrap();
         execute(dir, request)
             .map(|output| serde_json::to_value(output).unwrap())
             .map_err(|err| err.code)
+    }
+
+    #[test]
+    fn exclusive_rename_moves_onto_a_free_path_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("src"), "new").unwrap();
+        std::fs::write(root.join("file"), "old").unwrap();
+        std::fs::create_dir(root.join("dir")).unwrap();
+        std::os::unix::fs::symlink("missing", root.join("dangling")).unwrap();
+
+        for to in ["file", "dir", "dangling"] {
+            assert_eq!(
+                run(
+                    root,
+                    json!({"op": "rename", "path": "src", "to": to, "exclusive": true})
+                )
+                .unwrap_err(),
+                ErrorCode::Exists,
+                "{to}"
+            );
+        }
+        assert_eq!(std::fs::read_to_string(root.join("file")).unwrap(), "old");
+        assert!(root.join("dir").is_dir());
+        assert!(!root.join("missing").exists(), "the link is not followed");
+        assert_eq!(std::fs::read_to_string(root.join("src")).unwrap(), "new");
+
+        run(
+            root,
+            json!({"op": "rename", "path": "src", "to": "free", "exclusive": true}),
+        )
+        .unwrap();
+        assert_eq!(std::fs::read_to_string(root.join("free")).unwrap(), "new");
+        assert!(!root.join("src").exists());
+    }
+
+    #[test]
+    fn concurrent_exclusive_renames_have_exactly_one_winner() {
+        const N: usize = 16;
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        for i in 0..N {
+            std::fs::write(root.join(format!("src-{i}")), format!("content-{i}")).unwrap();
+        }
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(N));
+        let threads: Vec<_> = (0..N)
+            .map(|i| {
+                let (root, barrier) = (root.clone(), std::sync::Arc::clone(&barrier));
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    let request = json!({"op": "rename", "path": format!("src-{i}"),
+                                         "to": "dest", "exclusive": true});
+                    (i, run(&root, request))
+                })
+            })
+            .collect();
+        let mut winners = Vec::new();
+        for thread in threads {
+            match thread.join().unwrap() {
+                (i, Ok(_)) => winners.push(i),
+                (_, Err(code)) => assert_eq!(code, ErrorCode::Exists),
+            }
+        }
+        assert_eq!(winners.len(), 1, "{winners:?}");
+        assert_eq!(
+            std::fs::read_to_string(root.join("dest")).unwrap(),
+            format!("content-{}", winners[0])
+        );
+        assert_eq!(
+            std::fs::read_dir(&root).unwrap().count(),
+            N,
+            "losers keep their source"
+        );
+    }
+
+    #[test]
+    fn link_rename_moves_regular_files_and_refuses_the_rest() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("a"), "a").unwrap();
+        std::fs::write(root.join("taken"), "old").unwrap();
+        std::fs::create_dir(root.join("d")).unwrap();
+        std::os::unix::fs::symlink("missing", root.join("dangling")).unwrap();
+
+        for to in ["taken", "d", "dangling"] {
+            assert_eq!(
+                link_rename(&root.join("a"), &root.join(to))
+                    .unwrap_err()
+                    .code,
+                ErrorCode::Exists,
+                "{to}"
+            );
+        }
+        assert_eq!(std::fs::read_to_string(root.join("taken")).unwrap(), "old");
+        link_rename(&root.join("a"), &root.join("b")).unwrap();
+        assert_eq!(std::fs::read_to_string(root.join("b")).unwrap(), "a");
+        assert!(!root.join("a").exists());
+        assert_eq!(
+            link_rename(&root.join("d"), &root.join("e"))
+                .unwrap_err()
+                .code,
+            ErrorCode::Invalid
+        );
+        assert!(root.join("d").is_dir());
     }
 
     #[test]

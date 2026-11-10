@@ -57,7 +57,7 @@ rusqlite = { version = "0.41", features = ["bundled", "fallible_uint"] }
 rtnetlink = "0.24"
 # Safe sendmsg/recvmsg with SCM_RIGHTS for passing the TUN fd between processes,
 # and capability clearing in `sandbox-init` (nix has no capset wrapper).
-rustix = { version = "1.1.5", features = ["net", "thread"] }
+rustix = { version = "1.1.5", features = ["fs", "net", "thread"] }
 # RLIMIT_CORE = 0 at startup: a core dump would carry the connect token.
 rlimit = "0.11"
 # Direct dependency so the aws-lc-rs `CryptoProvider` can be installed at startup.

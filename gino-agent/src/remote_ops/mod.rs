@@ -176,12 +176,18 @@ impl RemoteOps {
                 reference,
                 sha256,
                 size,
+                exclusive,
             } => {
                 let bytes = byte_channel(bytes)?;
                 check_size(size, &bytes)?;
                 let dest = workspace_dir.join(path);
+                // Fast path only; the authoritative check is the no-replace
+                // link in `download_file`.
+                if exclusive && std::fs::symlink_metadata(&dest).is_ok() {
+                    return Err(FsError::new(ErrorCode::Exists, "path already exists"));
+                }
                 bytes
-                    .download_file(&reference, &sha256, size, &dest)
+                    .download_file(&reference, &sha256, size, &dest, exclusive)
                     .await?;
                 Ok(FsOutput::default())
             }
@@ -221,6 +227,7 @@ fn check_size(size: u64, bytes: &AttachmentManager) -> Result<(), FsError> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::os::unix::fs::MetadataExt;
     use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
@@ -446,6 +453,140 @@ mod tests {
             std::fs::read_dir(dir.path().join("real")).unwrap().count(),
             1
         );
+    }
+
+    fn put_exclusive(path: &str, reference: &str, content: &[u8]) -> Value {
+        json!({"op": "put", "path": path, "ref": reference, "sha256": sha256_hex(content),
+               "size": content.len(), "exclusive": true})
+    }
+
+    #[tokio::test]
+    async fn exclusive_put_creates_a_missing_file_with_the_default_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let (ops, channel) = enabled(dir.path(), 1024);
+        channel
+            .blobs
+            .lock()
+            .unwrap()
+            .insert("r".to_owned(), b"new".to_vec());
+
+        let done = ask(&ops, put_exclusive("f.txt", "r", b"new")).await;
+        assert_eq!(done, json!({"ok": true}));
+        let created = dir.path().join("f.txt");
+        assert_eq!(std::fs::read(&created).unwrap(), b"new");
+        let meta = std::fs::symlink_metadata(&created).unwrap();
+        assert!(meta.is_file());
+        assert_eq!(meta.nlink(), 1, "the temp link is gone");
+        let umask_default = std::fs::File::create(dir.path().join("probe"))
+            .and_then(|file| file.metadata())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(meta.permissions().mode(), umask_default);
+        std::fs::remove_file(dir.path().join("probe")).unwrap();
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[tokio::test]
+    async fn exclusive_put_onto_anything_existing_answers_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let (ops, channel) = enabled(dir.path(), 1024);
+        channel
+            .blobs
+            .lock()
+            .unwrap()
+            .insert("r".to_owned(), b"new".to_vec());
+        std::fs::write(dir.path().join("file"), "old").unwrap();
+        std::fs::create_dir(dir.path().join("dir")).unwrap();
+        std::os::unix::fs::symlink("missing", dir.path().join("dangling")).unwrap();
+
+        for path in ["file", "dir", "dangling"] {
+            let refused = ask(&ops, put_exclusive(path, "r", b"new")).await;
+            assert_eq!(refused["ok"], json!(false), "{path}");
+            assert_eq!(refused["error"]["code"], json!("exists"), "{path}");
+        }
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("file")).unwrap(),
+            "old"
+        );
+        assert!(dir.path().join("dir").is_dir());
+        assert!(
+            !dir.path().join("missing").exists(),
+            "the link is not followed"
+        );
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 3);
+    }
+
+    #[tokio::test]
+    async fn exclusive_download_refuses_a_destination_that_appeared_after_the_fast_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let (ops, channel) = enabled(dir.path(), 1024);
+        channel
+            .blobs
+            .lock()
+            .unwrap()
+            .insert("r".to_owned(), b"new".to_vec());
+        let dest = dir.path().join("f.txt");
+        std::os::unix::fs::symlink("missing", &dest).unwrap();
+        let bytes = ops.state.lock().unwrap().bytes.clone().unwrap();
+
+        // Bypass the early check: the no-replace link alone must refuse.
+        let err = bytes
+            .download_file("r", &sha256_hex(b"new"), 3, &dest, true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, AttachmentError::Io(io) if io.kind() == std::io::ErrorKind::AlreadyExists),
+            "{err:?}"
+        );
+        assert!(std::fs::symlink_metadata(&dest).unwrap().is_symlink());
+        assert!(!dir.path().join("missing").exists());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_exclusive_puts_have_exactly_one_winner() {
+        const N: usize = 16;
+        let dir = tempfile::tempdir().unwrap();
+        let (ops, channel) = enabled(dir.path(), 1024);
+        let ops = Arc::new(ops);
+        for i in 0..N {
+            channel
+                .blobs
+                .lock()
+                .unwrap()
+                .insert(format!("r{i}"), format!("content-{i}").into_bytes());
+        }
+
+        let tasks: Vec<_> = (0..N)
+            .map(|i| {
+                let ops = Arc::clone(&ops);
+                tokio::spawn(async move {
+                    let content = format!("content-{i}");
+                    let reference = format!("r{i}");
+                    let request = put_exclusive("f.txt", &reference, content.as_bytes());
+                    (i, ask(&ops, request).await)
+                })
+            })
+            .collect();
+        let mut winners = Vec::new();
+        for task in tasks {
+            let (i, answer) = task.await.unwrap();
+            if answer == json!({"ok": true}) {
+                winners.push(i);
+            } else {
+                assert_eq!(answer["error"]["code"], json!("exists"), "{answer}");
+            }
+        }
+        assert_eq!(winners.len(), 1, "{winners:?}");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            format!("content-{}", winners[0])
+        );
+        // Every loser removed its temp file.
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 
     #[tokio::test]

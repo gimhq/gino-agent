@@ -654,12 +654,18 @@ impl AttachmentManager {
     /// `max_bytes` cap, are verified against `sha256`, then renamed into place,
     /// so `dest` is never observed half-written. An existing `dest` keeps its
     /// permissions, and a symlink is written through to its target.
+    ///
+    /// With `exclusive` the temp file is hard-linked into place instead, which
+    /// fails with `AlreadyExists` if anything (a dangling symlink included)
+    /// already sits at `dest`; `dest` is then never followed nor touched and the
+    /// new file keeps the default mode.
     pub(crate) async fn download_file(
         &self,
         reference: &str,
         sha256: &str,
         max_bytes: u64,
         dest: &Path,
+        exclusive: bool,
     ) -> Result<(), AttachmentError> {
         let descriptor = AttachmentDescriptor {
             id: String::new(),
@@ -670,12 +676,23 @@ impl AttachmentManager {
             reference: reference.to_owned(),
             direction: None,
         };
-        let dest = std::fs::canonicalize(dest).unwrap_or_else(|_| dest.to_path_buf());
+        let dest = if exclusive {
+            dest.to_path_buf()
+        } else {
+            std::fs::canonicalize(dest).unwrap_or_else(|_| dest.to_path_buf())
+        };
         let mut tmp = dest.as_os_str().to_owned();
         tmp.push(format!(".{}.part", uuid::Uuid::new_v4()));
         let tmp = PathBuf::from(tmp);
         let result = self.stream_verified(&descriptor, max_bytes, &tmp).await;
         let result = result.and_then(|()| {
+            if exclusive {
+                // link(2) never replaces its target: of concurrent exclusive
+                // puts exactly one wins, the rest get EEXIST.
+                std::fs::hard_link(&tmp, &dest)?;
+                let _ = std::fs::remove_file(&tmp);
+                return Ok(());
+            }
             if let Ok(existing) = std::fs::metadata(&dest) {
                 std::fs::set_permissions(&tmp, existing.permissions())?;
             }
