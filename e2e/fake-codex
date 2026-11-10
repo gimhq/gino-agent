@@ -36,6 +36,10 @@ TID="codex-e2e-$$"
 # exits with `error: unexpected argument` otherwise. A permissive stub hides
 # exactly that class of bug (it did once), so reject anything the real binary
 # would reject.
+if [ -n "${FAKE_ENGINE_LOG:-}" ]; then
+  jq -cn --arg probe "${JOINT_PROBE:-}" '{engine:"codex",argv:$ARGS.positional,probe:$probe}' \
+    --args -- "$@" >> "$FAKE_ENGINE_LOG"
+fi
 seen_exec=0
 while [ $# -gt 0 ]; do
   case "$1" in

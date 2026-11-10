@@ -30,7 +30,22 @@
 # `--settings`, or `autoMemoryEnabled:false` plus
 # `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`), so the e2e can assert the effective
 # memory settings.
+#
+# For host joint runs it also:
+#   - appends `{"engine":"claude","argv":[...],"probe":"$JOINT_PROBE"}` to
+#     `$FAKE_ENGINE_LOG` when that variable is set (a host can set both through
+#     `config.engine.env`, proving flags and env reach the engine);
+#   - copies each file of `../inputs/` (the work dir's inbound attachments) to
+#     `../output/<name>.out` prefixed with `processed:`, so result attachments
+#     come back;
+#   - waits N seconds after its first event when the prompt holds `sleep:N`, so
+#     an interrupt can land mid-turn.
 set -u
+
+if [ -n "${FAKE_ENGINE_LOG:-}" ]; then
+  jq -cn --arg probe "${JOINT_PROBE:-}" '{engine:"claude",argv:$ARGS.positional,probe:$probe}' \
+    --args -- "$@" >> "$FAKE_ENGINE_LOG"
+fi
 
 settings="{}"
 prev=""
@@ -83,6 +98,13 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   fi
 done
 
+if [ -d ../inputs ]; then
+  mkdir -p ../output
+  for f in ../inputs/*; do
+    [ -f "$f" ] && { printf 'processed:'; cat "$f"; } > "../output/$(basename "$f").out"
+  done
+fi
+
 reply="gino-e2e ok"
 [ -n "$prompt" ] && reply="gino-e2e ok: ${prompt}"
 reply="${reply} memory-env task=$([ -n "${GINO_MEMORY_DIR:-}" ] && echo set || echo unset) agent=$([ -n "${GINO_AGENT_MEMORY_DIR:-}" ] && echo set || echo unset) automem=${automem}"
@@ -90,6 +112,10 @@ reply="${reply} memory-env task=$([ -n "${GINO_MEMORY_DIR:-}" ] && echo set || e
 # 3) Assistant text block — jq builds valid JSON regardless of prompt contents.
 emit "$(jq -cn --arg t "$reply" \
   '{type:"assistant",message:{role:"assistant",content:[{type:"text",text:$t}]}}')"
+# A `sleep:N` prompt holds the turn open after its first event.
+case "$prompt" in
+  *sleep:[0-9]*) sleep "$(printf '%s' "$prompt" | sed -n 's/.*sleep:\([0-9]*\).*/\1/p')" ;;
+esac
 
 # 4) Sub-agent sequence — a `Task` tool_use spawned by the main agent, the
 #    sub-agent's own text (attributed by parent_tool_use_id) and the tool_result
