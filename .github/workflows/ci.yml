@@ -123,6 +123,13 @@ jobs:
           fi
           ls -l "$bin"
 
+      # The binary the joint job runs against mini-host: the release build, not a debug one.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gino-agent-musl
+          path: gino-agent/target/x86_64-unknown-linux-musl/release/gino-agent
+          retention-days: 3
+
   vmm:
     name: vmm (rust) — fmt + clippy + test + supply chain
     runs-on: ubuntu-latest
@@ -272,6 +279,49 @@ jobs:
 
       - name: Shear (unused dependencies)
         run: cargo shear
+
+  joint:
+    name: joint suite — the static agent against mini-host
+    needs: agent-musl
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: gino-mini-host
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-mini-host/target
+          key: cargo-joint-${{ runner.os }}-${{ hashFiles('gino-mini-host/Cargo.lock') }}
+          restore-keys: |
+            cargo-joint-${{ runner.os }}-
+            cargo-mini-host-${{ runner.os }}-
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: gino-agent-musl
+          path: ${{ runner.temp }}/agent
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+
+      # The e2e/ fake engines need bash and jq (both on the runner image).
+      - name: Joint suite
+        run: |
+          chmod +x "$RUNNER_TEMP/agent/gino-agent"
+          GINO_AGENT_BIN="$RUNNER_TEMP/agent/gino-agent" \
+            cargo nextest run --release --locked --test joint --run-ignored only
 
   e2ee-ts:
     name: e2ee (ts) — wasm build + bun test
