@@ -140,6 +140,8 @@ fn claude_script(out: &Path, m: &Markers) -> String {
         concat!(
             "#!/usr/bin/env bash\nset -u\nout=\"{}\"\nn=$$\n",
             "[ \"${{1:-}}\" = --version ] && {{ echo '0.0.0 (fake)'; exit 0; }}\n",
+            // The engine probe (`auth status`, the init models) is not a run.
+            "case \" $* \" in *' --session-id '*|*' --resume '*) ;; *) exit 1 ;; esac\n",
             "env > \"$out/env.$n\"\n",
             "printf '%s\\n' \"$@\" > \"$out/argv.$n\"\n",
             "pwd > \"$out/cwd.$n\"\n",

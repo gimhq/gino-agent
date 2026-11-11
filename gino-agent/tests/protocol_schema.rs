@@ -166,6 +166,29 @@ fn the_schema_carries_every_field_the_runner_reads_or_reports() {
             "defaults.{field}"
         );
     }
+    let engine = data_schema("AgentFrame", "heartbeat")["properties"]["engines"]["items"].clone();
+    for field in [
+        "name",
+        "version",
+        "path",
+        "auth",
+        "models",
+        "defaultModel",
+        "baseUrlHost",
+    ] {
+        assert!(
+            engine["properties"].get(field).is_some(),
+            "engines[].{field}"
+        );
+    }
+    for field in ["id", "name", "description", "isDefault"] {
+        assert!(
+            engine["properties"]["models"]["items"]["properties"]
+                .get(field)
+                .is_some(),
+            "engines[].models[].{field}"
+        );
+    }
     let usage = data_schema("AgentFrame", "thread_result")["properties"]["usage"].clone();
     for field in ["inputTokens", "outputTokens", "cacheReadTokens", "costUsd"] {
         assert!(usage["properties"].get(field).is_some(), "usage.{field}");

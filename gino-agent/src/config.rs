@@ -249,6 +249,8 @@ pub(crate) struct EngineConfig {
     pub(crate) anthropic_base_url: Option<String>,
     /// Model id the engine should default to.
     pub(crate) model: Option<String>,
+    /// The engine of a task that names none (`engine.defaultEngine`); `None` is claude.
+    pub(crate) default_engine: Option<String>,
     /// Tools the engine is permitted to use.
     pub(crate) allowed_tools: Vec<String>,
     /// Model claude falls back to when the main one is overloaded (`--fallback-model`).
@@ -484,6 +486,7 @@ impl Config {
             claude_code_oauth_token,
             anthropic_base_url,
             model,
+            default_engine,
             allowed_tools,
             fallback_model,
             max_turns,
@@ -499,6 +502,10 @@ impl Config {
         );
         overlay_field(&mut self.engine.anthropic_base_url, anthropic_base_url);
         overlay_field(&mut self.engine.model, model);
+        overlay_field(
+            &mut self.engine.default_engine,
+            default_engine.filter(|name| !name.trim().is_empty()),
+        );
         if let Some(tools) = allowed_tools {
             self.engine.allowed_tools = tools;
         }
@@ -678,17 +685,34 @@ impl Config {
 
     /// The engine defaults register and heartbeats report: the engine an
     /// unpinned task runs, its model and only the host of the base URL.
+    /// The engine a task that names none runs on.
+    pub(crate) fn default_engine(&self) -> &str {
+        self.engine
+            .default_engine
+            .as_deref()
+            .map_or("claude", str::trim)
+    }
+
+    /// What a task without its own engine and model runs with, as far as the config
+    /// says; the heartbeat fills a missing model in from the engine probe.
     pub(crate) fn runner_defaults(&self) -> RunnerDefaults {
+        let engine = self.default_engine();
+        let (model, base_url) = if engine == "codex" {
+            (&self.engine.codex.model, &self.engine.codex.openai_base_url)
+        } else {
+            (&self.engine.model, &self.engine.anthropic_base_url)
+        };
         RunnerDefaults {
-            engine: "claude".to_owned(),
-            model: self.engine.model.clone(),
-            base_url_host: self
-                .engine
-                .anthropic_base_url
-                .as_deref()
-                .and_then(|url| reqwest::Url::parse(url).ok()?.host_str().map(str::to_owned)),
+            engine: engine.to_owned(),
+            model: model.clone(),
+            base_url_host: base_url.as_deref().and_then(url_host),
         }
     }
+}
+
+/// The host of `url`, never its credentials, port, path or query.
+pub(crate) fn url_host(url: &str) -> Option<String> {
+    reqwest::Url::parse(url).ok()?.host_str().map(str::to_owned)
 }
 
 /// Resolve the `CLAUDE_CONFIG_USE_DEFAULT` opt-in: `None` when the flag is unset
@@ -838,6 +862,7 @@ struct EngineOverlay {
     claude_code_oauth_token: Option<String>,
     anthropic_base_url: Option<String>,
     model: Option<String>,
+    default_engine: Option<String>,
     allowed_tools: Option<Vec<String>>,
     fallback_model: Option<String>,
     max_turns: Option<u32>,
@@ -2576,6 +2601,42 @@ mod tests {
         );
         merge_patch(&mut target, &json!({ "engine": null }));
         assert_eq!(target, json!({ "heartbeatIntervalMs": 1000 }));
+    }
+
+    #[test]
+    fn the_default_engine_drives_the_defaults_and_clears_with_null() {
+        use crate::protocol::frames::RunnerDefaults;
+
+        let mut layered = LayeredConfig::new(Config::default());
+        let config = layered
+            .update(&json!({ "engine": {
+                "model": "m-claude",
+                "defaultEngine": "codex",
+                "codex": { "model": "gpt-x", "openaiBaseUrl": "https://openai.example/v1" },
+            } }))
+            .unwrap();
+        assert_eq!(config.default_engine(), "codex");
+        assert_eq!(
+            config.runner_defaults(),
+            RunnerDefaults {
+                engine: "codex".to_owned(),
+                model: Some("gpt-x".to_owned()),
+                base_url_host: Some("openai.example".to_owned()),
+            }
+        );
+        let config = layered
+            .update(&json!({ "engine": { "defaultEngine": null } }))
+            .unwrap();
+        assert_eq!(config.default_engine(), "claude");
+        assert_eq!(config.runner_defaults().model.as_deref(), Some("m-claude"));
+        let config = layered
+            .update(&json!({ "engine": { "defaultEngine": " " } }))
+            .unwrap();
+        assert_eq!(
+            config.default_engine(),
+            "claude",
+            "a blank name is no choice"
+        );
     }
 
     #[test]

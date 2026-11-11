@@ -578,6 +578,9 @@ pub(crate) struct ThreadExecutor {
     /// The e2ee state; `None` until the runner wires it. An encrypted task's
     /// run fails `not_member` without it.
     e2ee: Option<Arc<E2ee>>,
+    /// The configured engine of a task that names none (`engine.defaultEngine`),
+    /// read at every spawn; `None` until the runner wires it.
+    default_engine: Option<Arc<Mutex<String>>>,
 }
 
 impl std::fmt::Debug for ThreadExecutor {
@@ -614,7 +617,14 @@ impl ThreadExecutor {
             task_memory: memory::TaskMemory::default(),
             conversations_max_bytes: sandbox::DEFAULT_CONVERSATIONS_MAX_BYTES,
             e2ee: None,
+            default_engine: None,
         }
+    }
+
+    /// Wire the live default engine (`engine.defaultEngine`).
+    pub(crate) fn with_default_engine(mut self, default_engine: Arc<Mutex<String>>) -> Self {
+        self.default_engine = Some(default_engine);
+        self
     }
 
     /// Register an ADDITIONAL backend alongside the default one [`Self::new`]
@@ -939,16 +949,22 @@ impl ThreadExecutor {
             ..SessionCfg::default()
         };
         // Backend selection, in order: the TASK row's `engine` (the host's
-        // `task_upsert.data.engine`), else the thread's own birth engine, else
-        // the registry default. Read HERE, at spawn, for the same reason the
-        // per-task model is — a `task_upsert` that changes the engine reaches the
-        // NEXT run without disturbing the one in flight. The thread row's
-        // `engine` is immutable once born, so it stays the run's fallback rather
-        // than being rewritten to what actually ran. An unregistered name is not
-        // fatal: the registry warns and answers the default (forward-compat with
-        // a newer host, matching `warn_unsupported_engine`).
-        let requested =
-            task_engine(&self.db, &thread.task_id).or_else(|| non_empty(&thread.engine));
+        // `task_upsert.data.engine`), else the configured default engine, else
+        // the thread's own birth engine, else the registry default. Read HERE, at
+        // spawn, for the same reason the per-task model is — a `task_upsert` or
+        // `config_update` that changes the engine reaches the NEXT run without
+        // disturbing the one in flight. The thread row's `engine` is immutable
+        // once born, so it stays the run's fallback rather than being rewritten
+        // to what actually ran. An unregistered name is not fatal: the registry
+        // warns and answers the default (forward-compat with a newer host,
+        // matching `warn_unsupported_engine`).
+        let requested = task_engine(&self.db, &thread.task_id)
+            .or_else(|| {
+                self.default_engine.as_ref().and_then(|name| {
+                    non_empty(&name.lock().unwrap_or_else(PoisonError::into_inner))
+                })
+            })
+            .or_else(|| non_empty(&thread.engine));
         let (engine_name, engine) = self.engines.resolve(requested.as_deref());
         debug!(thread = %thread.id, engine = %engine_name, "engine selected");
         let mut run = RunInfo {

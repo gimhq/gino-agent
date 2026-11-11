@@ -31,6 +31,8 @@ pub(crate) mod admin;
 pub(crate) mod claude;
 /// The Codex backend: one `codex exec --json` child per turn.
 pub(crate) mod codex;
+/// What the engine CLIs report about themselves: models and sign-in state.
+pub(crate) mod probe;
 /// The name → backend map the executor dispatches through; a run picks its
 /// backend by name, and an unknown name falls back to the default rather than
 /// failing.

@@ -39,7 +39,7 @@
 //!   ([`crate::db::Db::mark_inbox_processed`]); `close` is marked processed
 //!   *before* delivery to avoid a spurious re-shutdown on crash recovery.
 
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use futures_util::stream::SplitSink;
@@ -58,7 +58,7 @@ use tracing::{debug, warn};
 use super::{Backoff, Cancel, DsLink, Inbound, build_envelope, lock_db};
 use crate::db::Db;
 use crate::e2ee;
-use crate::engine::admin::EngineInfo;
+use crate::engine::admin::{EngineInfo, SharedEngines};
 use crate::protocol::frames::{
     E2eeCapability, E2eeLiveFrame, HeartbeatData, InboundFrame, OutboundFrame, RunnerDefaults,
 };
@@ -738,11 +738,11 @@ async fn send_msg_ack(sink: &mut WsSink, msg_id: String) -> Result<(), Tungsteni
 }
 
 /// The parts of the periodic liveness ping; `engines` is set once the
-/// startup probe finishes, and heartbeats before that omit it.
+/// engine probe finishes, and heartbeats before that omit it.
 #[derive(Debug)]
 pub(super) struct HeartbeatFrame {
     pub(super) capabilities: Vec<String>,
-    pub(super) engines: Arc<OnceLock<Vec<EngineInfo>>>,
+    pub(super) engines: SharedEngines,
     pub(super) e2ee: Option<E2eeCapability>,
     pub(super) config_version: Arc<Mutex<Option<i64>>>,
     pub(super) defaults: Arc<Mutex<Option<RunnerDefaults>>>,
@@ -750,20 +750,41 @@ pub(super) struct HeartbeatFrame {
 
 impl HeartbeatFrame {
     fn render(&self) -> String {
+        let engines = self
+            .engines
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .unwrap_or_default();
+        let defaults = self
+            .defaults
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .map(|defaults| with_probed_model(defaults, &engines));
         heartbeat_frame(
             self.capabilities.clone(),
-            self.engines.get().cloned().unwrap_or_default(),
+            engines,
             self.e2ee.clone(),
             *self
                 .config_version
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner),
-            self.defaults
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .clone(),
+            defaults,
         )
     }
+}
+
+/// `defaults` with a model the config leaves unset taken from the default engine's
+/// probe: the model its CLI runs when none is requested.
+fn with_probed_model(mut defaults: RunnerDefaults, engines: &[EngineInfo]) -> RunnerDefaults {
+    if defaults.model.is_none() {
+        defaults.model = engines
+            .iter()
+            .find(|engine| engine.name == defaults.engine)
+            .and_then(|engine| engine.default_model.clone());
+    }
+    defaults
 }
 
 /// Serialize the periodic liveness ping, carrying `capabilities`, the
@@ -907,7 +928,7 @@ mod tests {
         INBOX_TYPE_CLOSE, INBOX_TYPE_CONFIG_UPDATE, InboundDisposition, MAX_HEARTBEAT,
         MAX_OUTBOX_RETRIES, MIN_HEARTBEAT, ack_stalled, clamp_period, classify_inbound,
         collect_outbox_replay, correlation_of, heartbeat_frame, inbox_type, msg_id_of, read_window,
-        replay_inbox,
+        replay_inbox, with_probed_model,
     };
     use crate::db::Db;
     use crate::protocol::frames::{InboundFrame, MessageInData};
@@ -1184,10 +1205,49 @@ mod tests {
             name: "claude".to_owned(),
             version: Some("2.1.310".to_owned()),
             path: "/ws/engines/home/.local/bin/claude".to_owned(),
+            ..Default::default()
         };
         assert_eq!(
             heartbeat_frame(vec!["claude".to_owned()], vec![claude], None, None, None),
             r#"{"type":"heartbeat","data":{"capabilities":["claude"],"engines":[{"name":"claude","version":"2.1.310","path":"/ws/engines/home/.local/bin/claude"}]}}"#
+        );
+    }
+
+    /// A model the config leaves unset is the default engine's probed default; a
+    /// configured one is kept.
+    #[test]
+    fn defaults_take_the_probed_model_of_the_default_engine() {
+        use crate::engine::admin::EngineInfo;
+        use crate::protocol::frames::RunnerDefaults;
+
+        let engines = [
+            EngineInfo {
+                name: "claude".to_owned(),
+                default_model: Some("claude-x".to_owned()),
+                ..EngineInfo::default()
+            },
+            EngineInfo {
+                name: "codex".to_owned(),
+                default_model: Some("gpt-x".to_owned()),
+                ..EngineInfo::default()
+            },
+        ];
+        let defaults = |engine: &str, model: Option<&str>| RunnerDefaults {
+            engine: engine.to_owned(),
+            model: model.map(str::to_owned),
+            base_url_host: None,
+        };
+        assert_eq!(
+            with_probed_model(defaults("codex", None), &engines),
+            defaults("codex", Some("gpt-x"))
+        );
+        assert_eq!(
+            with_probed_model(defaults("claude", Some("m-1")), &engines),
+            defaults("claude", Some("m-1"))
+        );
+        assert_eq!(
+            with_probed_model(defaults("claude", None), &[]),
+            defaults("claude", None)
         );
     }
 

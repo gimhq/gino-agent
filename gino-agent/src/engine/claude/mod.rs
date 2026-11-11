@@ -41,6 +41,7 @@ use uuid::Uuid;
 use self::control::ControlAsk;
 use self::events::EventMapper;
 use crate::config::{Config, McpServer};
+use crate::engine::probe::ProbeCommand;
 use crate::engine::{
     AgentApiAccess, Engine, EngineError, EngineEvent, EventStream, LogLevel, Session, SessionCfg,
 };
@@ -162,6 +163,35 @@ impl ClaudeSettings {
             memory_max_bytes: config.memory.max_bytes,
             ..Self::default()
         }
+    }
+
+    /// The command the CLI probe runs: this binary with the credential env and the
+    /// config dir of a real run, in the workspace dir.
+    pub(crate) fn probe_command(&self) -> ProbeCommand {
+        let mut env: Vec<(String, OsString)> = self
+            .env
+            .iter()
+            .map(|(key, value)| (key.clone(), value.into()))
+            .collect();
+        env.extend(
+            config_dir_env(self)
+                .into_iter()
+                .map(|(key, value)| (key.to_owned(), value.into())),
+        );
+        ProbeCommand {
+            program: self.binary.clone(),
+            env,
+            cwd: self.workspace_dir.clone(),
+        }
+    }
+
+    /// The host of `ANTHROPIC_BASE_URL`, when one is configured.
+    pub(crate) fn base_url_host(&self) -> Option<String> {
+        self.env
+            .iter()
+            .rev()
+            .find(|(key, _)| key == "ANTHROPIC_BASE_URL")
+            .and_then(|(_, url)| crate::config::url_host(url))
     }
 }
 

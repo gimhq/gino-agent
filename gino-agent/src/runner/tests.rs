@@ -171,6 +171,8 @@ async fn serve_context(db: Arc<Mutex<Db>>, dir: &std::path::Path) -> ServeContex
         defaults: Arc::default(),
         engine_settings: settings.claude,
         codex_settings: settings.codex,
+        default_engine: settings.default_engine,
+        probe_wake: Arc::new(tokio::sync::Notify::new()),
         remote_ops,
         e2ee,
     }

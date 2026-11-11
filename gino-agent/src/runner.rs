@@ -50,9 +50,10 @@ use crate::chat::{
 use crate::config::{Config, ConfigOverlay, ExecutorConfig, LayeredConfig};
 use crate::db::{Db, TaskRow, ThreadRow};
 use crate::e2ee::{self, E2ee, E2eeKeys};
-use crate::engine::admin::{self, EngineInfo, EngineKind};
+use crate::engine::admin::{self, EngineInfo, EngineKind, SharedEngines};
 use crate::engine::claude::{ClaudeEngine, ClaudeSettings};
 use crate::engine::codex::{self, CodexEngine, CodexSettings};
+use crate::engine::probe::{self, ProbeCommand, ProbeReport};
 use crate::engine::{Engine, EngineError, Session, SessionCfg};
 use crate::executor::{ThreadExecutor, WatchdogCfg};
 use crate::memory;
@@ -217,18 +218,9 @@ async fn run_async(
         .and_then(|floor| floor.vm.as_ref());
     let capabilities = register::capabilities(&config, sandbox::probe(vm));
     info!(capabilities = ?capabilities, "runner capabilities");
-    // `--version` of a stuck engine must not hold up startup.
-    let engines = Arc::new(std::sync::OnceLock::new());
-    {
-        let engines = Arc::clone(&engines);
-        let workspace = config.paths.workspace_dir.clone();
-        let codex = config.engine.codex.binary.clone();
-        tokio::task::spawn_blocking(move || {
-            let report = engine_report(&workspace, codex.as_deref());
-            info!(engines = ?report, "engines");
-            let _ = engines.set(report);
-        });
-    }
+    // Filled by the engine probe once the host config is known (its credentials
+    // decide what the CLIs report); a stuck engine must not hold up startup.
+    let engines: SharedEngines = Arc::default();
     // The agent's own layers; the host's are kept apart (see [`LayeredConfig`]).
     let base = config.clone();
     let identity = register::load_or_register(
@@ -268,7 +260,7 @@ async fn run_async(
     let transport_config = TransportConfig {
         heartbeat: Duration::from_millis(config.heartbeat_interval_ms),
         capabilities,
-        engines,
+        engines: Arc::clone(&engines),
         e2ee: Some(e2ee_capability),
         config_version: Arc::clone(&config_version),
         defaults: Arc::clone(&defaults),
@@ -355,6 +347,13 @@ async fn run_async(
     if !config_settled {
         *lock(&config_version) = None;
     }
+    let probe_wake = Arc::new(Notify::new());
+    tokio::spawn(engine_probe_loop(
+        Arc::clone(&seams.claude),
+        Arc::clone(&seams.codex),
+        Arc::clone(&engines),
+        Arc::clone(&probe_wake),
+    ));
     let prompts = Arc::new(InboxPromptSource {
         db: Arc::clone(&db),
     });
@@ -393,6 +392,8 @@ async fn run_async(
         defaults,
         engine_settings: seams.claude,
         codex_settings: seams.codex,
+        default_engine: seams.default_engine,
+        probe_wake,
         remote_ops,
         e2ee,
     };
@@ -624,6 +625,7 @@ async fn build_execution_plane(
     let seams = EngineSeams {
         claude: Arc::new(Mutex::new(engine_settings(config, engine_config_dir))),
         codex: Arc::new(Mutex::new(codex_settings(config, engine_config_dir))),
+        default_engine: Arc::new(Mutex::new(config.default_engine().to_owned())),
     };
     let manager = build_attachment_manager(config, http);
 
@@ -709,7 +711,8 @@ fn build_executor(
     .with_flush(flush)
     .with_agent_memory_access(config.memory.agent_access)
     .with_task_memory(config.memory.task)
-    .with_conversations_max_bytes(config.memory.conversations_max_bytes);
+    .with_conversations_max_bytes(config.memory.conversations_max_bytes)
+    .with_default_engine(Arc::clone(&seams.default_engine));
     // The second backend, registered ONLY when its binary is actually there.
     // DECISION: registration and the advertised capability (`register.rs`) are
     // gated on the SAME probe, so the host is never told this runner can run an
@@ -829,6 +832,8 @@ type SharedCodexSettings = Arc<Mutex<CodexSettings>>;
 struct EngineSeams {
     claude: SharedEngineSettings,
     codex: SharedCodexSettings,
+    /// `engine.defaultEngine`, read by the executor at every spawn.
+    default_engine: Arc<Mutex<String>>,
 }
 
 /// An [`Engine`] over the [`SharedCodexSettings`] seam, mirroring
@@ -863,18 +868,113 @@ impl ReloadableCodexEngine {
     }
 }
 
-/// The engines the runner starts and their versions, as heartbeats report them.
-fn engine_report(workspace: &Path, codex: Option<&Path>) -> Vec<EngineInfo> {
-    let claude = admin::resolve_binary(workspace, EngineKind::Claude, None);
-    let codex = admin::resolve_binary(workspace, EngineKind::Codex, codex);
-    let path_env = std::env::var_os("PATH");
-    admin::report(
-        [
-            (EngineKind::Claude, claude.as_path()),
-            (EngineKind::Codex, codex.as_path()),
-        ],
-        path_env.as_deref(),
-    )
+/// How often the engines are probed again without a settings change: a login can
+/// expire or be renewed outside the agent.
+const ENGINE_REPROBE_INTERVAL: Duration = Duration::from_secs(3600);
+
+/// Keep the heartbeat engine list current. Every round reads the live settings; a
+/// changed probe command (binary, credentials, config dir) or the hourly tick
+/// probes the CLIs again, and every round refreshes the config-derived fields.
+async fn engine_probe_loop(
+    claude: SharedEngineSettings,
+    codex: SharedCodexSettings,
+    engines: SharedEngines,
+    wake: Arc<Notify>,
+) {
+    let mut probed: Option<([ProbeCommand; 2], Probed)> = None;
+    let mut due = true;
+    loop {
+        let (claude_now, codex_now) = (lock(&claude).clone(), lock(&codex).clone());
+        let commands = [claude_now.probe_command(), codex_now.probe_command()];
+        let stale = probed.as_ref().is_none_or(|(last, _)| *last != commands);
+        if due || stale {
+            let found = probe_engines(&commands).await;
+            info!(
+                engines = ?found
+                    .iter()
+                    .map(|(info, report)| (
+                        &info.name,
+                        report.auth,
+                        report.models.as_ref().map(Vec::len)
+                    ))
+                    .collect::<Vec<_>>(),
+                "engines probed"
+            );
+            probed = Some((commands, found));
+        }
+        let report = probed
+            .as_ref()
+            .map(|(_, found)| engine_entries(found, &claude_now, &codex_now))
+            .unwrap_or_default();
+        *lock(&engines) = Some(report);
+        tokio::select! {
+            () = wake.notified() => due = false,
+            () = tokio::time::sleep(ENGINE_REPROBE_INTERVAL) => due = true,
+        }
+    }
+}
+
+/// Each installed engine with what its CLI reported.
+type Probed = Vec<(EngineInfo, ProbeReport)>;
+
+/// The heartbeat entries: each probed engine with its configured default model
+/// (else the CLI's default) and API base URL host.
+fn engine_entries(
+    found: &Probed,
+    claude: &ClaudeSettings,
+    codex: &CodexSettings,
+) -> Vec<EngineInfo> {
+    found
+        .iter()
+        .map(|(info, report)| {
+            let (model, base_url_host) = if info.name == EngineKind::Codex.name() {
+                (codex.model.clone(), codex.base_url_host())
+            } else {
+                (claude.model.clone(), claude.base_url_host())
+            };
+            EngineInfo {
+                auth: report.auth,
+                models: report.models.clone(),
+                default_model: model.or_else(|| report.default_model().map(str::to_owned)),
+                base_url_host,
+                ..info.clone()
+            }
+        })
+        .collect()
+}
+
+/// The installed engines with their versions (`--version`, off the async
+/// runtime), each probed with its run command.
+async fn probe_engines(commands: &[ProbeCommand; 2]) -> Probed {
+    let binaries = [
+        (EngineKind::Claude, commands[0].program.clone()),
+        (EngineKind::Codex, commands[1].program.clone()),
+    ];
+    let installed = tokio::task::spawn_blocking(move || {
+        let path_env = std::env::var_os("PATH");
+        admin::report(
+            binaries
+                .iter()
+                .map(|(kind, binary)| (*kind, binary.as_path())),
+            path_env.as_deref(),
+        )
+    })
+    .await
+    .unwrap_or_default();
+    let probes = installed.iter().map(|info| {
+        let (kind, command) = if info.name == EngineKind::Codex.name() {
+            (EngineKind::Codex, &commands[1])
+        } else {
+            (EngineKind::Claude, &commands[0])
+        };
+        let command = ProbeCommand {
+            program: PathBuf::from(&info.path),
+            ..command.clone()
+        };
+        async move { probe::probe(kind, &command).await }
+    });
+    let reports = futures_util::future::join_all(probes).await;
+    installed.into_iter().zip(reports).collect()
 }
 
 /// Build the engine-free operations handle. Its file transfers get their own
@@ -1044,6 +1144,10 @@ struct ServeContext {
     /// [`ReloadableCodexEngine`]. Held whether or not the backend was registered,
     /// so the seam stays in step with the live config either way.
     codex_settings: SharedCodexSettings,
+    /// The live `engine.defaultEngine` the executor reads at every spawn.
+    default_engine: Arc<Mutex<String>>,
+    /// Wakes the engine probe after the engine settings change.
+    probe_wake: Arc<Notify>,
     /// Follows the live config: a `config_update` can switch a group on or off.
     remote_ops: Arc<RemoteOps>,
     /// All e2ee state; receives the durable DS records.
@@ -1580,7 +1684,7 @@ async fn apply_config_update(context: &ServeContext, data: &serde_json::Value) {
 /// (heartbeat cadence, paths) are merged too but only take effect where they
 /// are re-read — the transport and DB keep their startup values until restart.
 fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) -> bool {
-    let (rebuilt, rebuilt_codex) = {
+    let (rebuilt, rebuilt_codex, default_engine) = {
         let mut layered = lock(&context.config);
         let config = match layered.update(data) {
             Ok(config) => config,
@@ -1598,10 +1702,13 @@ fn apply_engine_config(context: &ServeContext, data: &serde_json::Value) -> bool
         (
             engine_settings(config, &context.engine_config_dir),
             codex_settings(config, &context.engine_config_dir),
+            config.default_engine().to_owned(),
         )
     };
     *lock(&context.engine_settings) = rebuilt;
     *lock(&context.codex_settings) = rebuilt_codex;
+    *lock(&context.default_engine) = default_engine;
+    context.probe_wake.notify_one();
     debug!(
         "config_update merged into the host config layer; engine settings apply on the next run"
     );

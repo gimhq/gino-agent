@@ -113,7 +113,7 @@ pub(crate) struct TransportConfig {
     /// Capabilities every heartbeat carries (`data.capabilities`).
     pub(crate) capabilities: Vec<String>,
     /// Engines the heartbeats carry (`data.engines`) once the probe sets them.
-    pub(crate) engines: Arc<std::sync::OnceLock<Vec<crate::engine::admin::EngineInfo>>>,
+    pub(crate) engines: crate::engine::admin::SharedEngines,
     /// The e2ee capability every heartbeat carries (`data.e2ee`).
     pub(crate) e2ee: Option<E2eeCapability>,
     /// The applied config version heartbeats report (`data.configVersion`).

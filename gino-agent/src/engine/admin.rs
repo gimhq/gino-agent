@@ -13,6 +13,8 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 
+use super::probe::{AuthStatus, ModelInfo};
+
 /// The engine home inside the workspace dir.
 const ENGINES_HOME: &str = "engines/home";
 /// Where the installers put their binaries, relative to the engine home.
@@ -259,14 +261,29 @@ fn verify(workspace_dir: &Path, kind: EngineKind) -> Result<()> {
     }
 }
 
-/// One engine as the agent would run it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// One engine as the agent would run it. `auth` and `models` come from the CLI
+/// probe ([`super::probe`]); `default_model` is the model a run without its own
+/// model gets (the configured one, else the CLI's default) and `base_url_host` the
+/// host of the configured API base URL.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct EngineInfo {
     pub(crate) name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) version: Option<String>,
     pub(crate) path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) auth: Option<AuthStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) models: Option<Vec<ModelInfo>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) default_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) base_url_host: Option<String>,
 }
+
+/// The engine list heartbeats carry, `None` until the first probe finishes.
+pub(crate) type SharedEngines = std::sync::Arc<std::sync::Mutex<Option<Vec<EngineInfo>>>>;
 
 /// The engines in `binaries` that resolve to an executable, with their versions.
 pub(crate) fn report<'a>(
@@ -281,6 +298,7 @@ pub(crate) fn report<'a>(
                 name: kind.name().to_owned(),
                 version: version(&path),
                 path: path.display().to_string(),
+                ..EngineInfo::default()
             })
         })
         .collect()
@@ -435,6 +453,7 @@ mod tests {
                 name: "claude".into(),
                 version: Some("2.1.310".into()),
                 path: claude.display().to_string(),
+                ..EngineInfo::default()
             }]
         );
     }

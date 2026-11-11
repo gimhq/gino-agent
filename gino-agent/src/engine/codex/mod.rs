@@ -40,6 +40,7 @@ use tracing::{debug, warn};
 
 use self::events::EventMapper;
 use crate::config::{Config, McpServer};
+use crate::engine::probe::ProbeCommand;
 use crate::engine::{Engine, EngineError, EngineEvent, EventStream, LogLevel, Session, SessionCfg};
 use crate::memory::{self, AgentMemoryAccess};
 use crate::sandbox::vm::VmMonitor;
@@ -168,6 +169,33 @@ impl CodexSettings {
             memory_max_bytes: config.memory.max_bytes,
             mcp_servers: config.engine.mcp_servers.clone(),
         }
+    }
+
+    /// The command the CLI probe runs: this binary with the credential env and the
+    /// config dir of a real run, in the workspace dir.
+    pub(crate) fn probe_command(&self) -> ProbeCommand {
+        let mut env: Vec<(String, OsString)> = self
+            .env
+            .iter()
+            .map(|(key, value)| (key.clone(), value.into()))
+            .collect();
+        env.extend(
+            config_dir_env(self)
+                .into_iter()
+                .map(|(key, value)| (key.to_owned(), value.into())),
+        );
+        ProbeCommand {
+            program: self.binary.clone(),
+            env,
+            cwd: self.workspace_dir.clone(),
+        }
+    }
+
+    /// The host of the configured OpenAI base URL.
+    pub(crate) fn base_url_host(&self) -> Option<String> {
+        self.openai_base_url
+            .as_deref()
+            .and_then(crate::config::url_host)
     }
 }
 
