@@ -246,7 +246,13 @@ fn error_line(session_id: &str, error: &str) -> serde_json::Value {
 
 /// Render the bash script body implementing `behavior`.
 fn render(behavior: &Behavior) -> String {
-    let mut script = String::from("#!/usr/bin/env bash\nset -u\n");
+    // The agent's engine probe (`--version`, `auth status`, the init models) is not a
+    // run and runs outside the work dir: answer it before any behaviour touches files.
+    let mut script = String::from(concat!(
+        "#!/usr/bin/env bash\nset -u\n",
+        "[ \"${1:-}\" = --version ] && { echo '0.0.0 (fake)'; exit 0; }\n",
+        "case \" $* \" in *' --session-id '*|*' --resume '*) ;; *) exit 1 ;; esac\n",
+    ));
     match behavior {
         Behavior::Echo { session_id, lines } => {
             script.push_str(&emit(&init_line(session_id)));
