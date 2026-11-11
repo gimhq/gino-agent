@@ -51,6 +51,10 @@
 //! GET    /api/threads/{threadId}/wait?timeoutMs=60000&after={runs}
 //! GET    /api/crons
 //! ```
+//!
+//! A task's `engine` must be one the agent advertises in `capabilities`, and its `model` one
+//! the agent's probe listed for that engine (`engines[].models` on the agent view); otherwise
+//! creating or patching the task answers 400.
 
 mod agent;
 mod api;

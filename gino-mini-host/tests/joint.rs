@@ -449,6 +449,117 @@ async fn engine_options_reach_the_engine_and_clear_with_null() {
     assert_eq!(defaults["model"], "m-config");
 }
 
+/// The heartbeat entry of engine `name`.
+fn engine<'a>(engines: &'a Value, name: &str) -> &'a Value {
+    engines
+        .as_array()
+        .and_then(|engines| engines.iter().find(|e| e["name"] == name))
+        .unwrap_or(&Value::Null)
+}
+
+fn model_ids(engine: &Value) -> Vec<&str> {
+    engine["models"]
+        .as_array()
+        .map(|models| models.iter().filter_map(|m| m["id"].as_str()).collect())
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+#[ignore = "needs GINO_AGENT_BIN"]
+async fn engines_report_models_and_sign_in_and_tasks_are_checked_against_them() {
+    let joint = Joint::start(json!({})).await;
+    let engines = joint
+        .until("the probe reports both engines", || async {
+            let engines = joint.agent().await["engines"].clone();
+            let probed = ["claude", "codex"]
+                .iter()
+                .all(|name| engine(&engines, name)["models"].is_array());
+            probed.then_some(engines)
+        })
+        .await;
+    let (claude, codex) = (engine(&engines, "claude"), engine(&engines, "codex"));
+    assert_eq!(claude["version"], "2.0.0");
+    assert_eq!(model_ids(claude), ["fake-e2e", "m-task"]);
+    assert_eq!(claude["models"][0]["isDefault"], true);
+    assert_eq!(claude["defaultModel"], "fake-e2e", "the CLI's default");
+    assert_eq!(model_ids(codex), ["gpt-fake", "gpt-joint"], "every page");
+    assert_eq!(codex["defaultModel"], "gpt-fake");
+    for e in [claude, codex] {
+        assert_eq!(e["auth"], "unauthenticated", "no credential yet: {e}");
+    }
+    joint
+        .until("defaults take the probed model", || async {
+            (joint.agent().await["defaults"] == json!({ "engine": "claude", "model": "fake-e2e" }))
+                .then_some(())
+        })
+        .await;
+
+    // Credentials re-probe the engines; `defaultEngine` moves the defaults to codex.
+    joint
+        .configure(json!({ "engine": {
+            "anthropicApiKey": "sk-joint",
+            "defaultEngine": "codex",
+            "codex": { "openaiApiKey": "sk-joint-codex", "openaiBaseUrl": "https://openai.example/v1" },
+        } }))
+        .await;
+    joint
+        .until("the re-probe sees both engines signed in", || async {
+            let engines = joint.agent().await["engines"].clone();
+            ["claude", "codex"]
+                .iter()
+                .all(|name| engine(&engines, name)["auth"] == "authenticated")
+                .then_some(())
+        })
+        .await;
+    let expected =
+        json!({ "engine": "codex", "model": "gpt-fake", "baseUrlHost": "openai.example" });
+    joint
+        .until("defaults follow the default engine", || async {
+            (joint.agent().await["defaults"] == expected).then_some(())
+        })
+        .await;
+    let seen = joint.agent().await.to_string();
+    assert!(!seen.contains("sk-joint"), "a key reached the agent view");
+
+    // The host checks a task's engine and model against what the agent reported.
+    for (body, reason) in [
+        (json!({ "engine": "gemini" }), "does not run engine gemini"),
+        (
+            json!({ "engine": "claude", "model": "gpt-joint" }),
+            "offers no model gpt-joint",
+        ),
+        (json!({ "model": "m-task" }), "engine codex"),
+    ] {
+        let (status, rejected) = joint.post("/api/tasks", body).await;
+        assert_eq!(status, 400, "{rejected}");
+        assert!(
+            rejected["error"].as_str().unwrap().contains(reason),
+            "{rejected}"
+        );
+    }
+    let task = joint.create_task(json!({ "model": "gpt-joint" })).await;
+    let (status, rejected) = joint
+        .patch(&format!("/api/tasks/{task}"), json!({ "engine": "claude" }))
+        .await;
+    assert_eq!(
+        status, 400,
+        "the stored model is not a claude model: {rejected}"
+    );
+    let (status, body) = joint
+        .patch(
+            &format!("/api/tasks/{task}"),
+            json!({ "engine": "claude", "model": "m-task" }),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+
+    // A task that names no engine runs on the default engine.
+    let task = joint.create_task(json!({ "name": "default engine" })).await;
+    let view = joint.run(&task, json!({ "text": "which engine" })).await;
+    assert_eq!(view["run"]["status"], "succeeded", "{view}");
+    assert_eq!(view["run"]["engine"], "codex");
+}
+
 // ─── delivery: replay, interrupt, close ─────────────────────────────────────
 
 #[tokio::test]

@@ -181,6 +181,58 @@ fn pick_agent(host: &Host, explicit: Option<&str>) -> Result<Result<String, Resp
     })
 }
 
+/// Check a task definition's `engine` and `model` against what the agent last reported: the
+/// engine must be one it advertises in `capabilities` (protocol §3), and the model one the
+/// engine's CLI lists in `heartbeat.engines[].models`. A list the agent has not reported yet
+/// is not checked. Returns the reason for a 400.
+fn check_engine_model(
+    host: &Host,
+    agent_id: &str,
+    definition: &Value,
+) -> Result<Option<String>, HostError> {
+    let (register, heartbeat): (String, Option<String>) = lock(&host.db).query_row(
+        "SELECT register, heartbeat FROM agents WHERE id = ?",
+        [agent_id],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let register = parse_json_text(Some(&register));
+    let heartbeat = parse_json_text(heartbeat.as_deref());
+    let engine = str_field(definition, "engine");
+    if let Some(engine) = engine
+        && let Some(capabilities) = heartbeat
+            .get("capabilities")
+            .or_else(|| register.get("capabilities"))
+            .and_then(Value::as_array)
+        && !capabilities.iter().any(|name| name == engine)
+    {
+        return Ok(Some(format!(
+            "agent {agent_id} does not run engine {engine}"
+        )));
+    }
+    let Some(model) = str_field(definition, "model") else {
+        return Ok(None);
+    };
+    let engine = engine
+        .or_else(|| {
+            heartbeat
+                .pointer("/defaults/engine")
+                .and_then(Value::as_str)
+        })
+        .unwrap_or("claude");
+    let models = heartbeat["engines"]
+        .as_array()
+        .and_then(|engines| engines.iter().find(|e| e["name"] == engine))
+        .and_then(|e| e["models"].as_array());
+    if let Some(models) = models
+        && !models.iter().any(|m| m["id"] == model)
+    {
+        return Ok(Some(format!(
+            "engine {engine} on agent {agent_id} offers no model {model}"
+        )));
+    }
+    Ok(None)
+}
+
 /// The `task_upsert` fields present in an operator body; `null` is kept (it clears `engine` /
 /// `model` on the agent).
 fn task_fields(body: &Value) -> Map<String, Value> {
@@ -217,6 +269,9 @@ pub(crate) async fn create_task(State(host): Shared, body: Bytes) -> Reply {
     let encrypted = body.get("encrypted") == Some(&Value::Bool(true));
     let mut data = task_fields(&body);
     data.entry("status").or_insert_with(|| json!("active"));
+    if let Some(message) = check_engine_model(&host, &agent_id, &Value::Object(data.clone()))? {
+        return Ok(fail(StatusCode::BAD_REQUEST, &message));
+    }
     // An encrypted task is placed only on a runner that can hold its key (downgrade refusal).
     let group = if encrypted {
         match e2ee::create_group(&host, &agent_id, &task_id)? {
@@ -276,20 +331,22 @@ pub(crate) async fn update_task(
     {
         return Ok(fail(StatusCode::BAD_REQUEST, &message));
     }
+    let definition: String = lock(&host.db).query_row(
+        "SELECT definition FROM tasks WHERE id = ?",
+        [&task_id],
+        |r| r.get(0),
+    )?;
+    let mut definition = parse_json_text(Some(&definition));
+    merge_patch(&mut definition, &Value::Object(data.clone()));
+    if (data.contains_key("engine") || data.contains_key("model"))
+        && let Some(message) = check_engine_model(&host, &task.agent_id, &definition)?
     {
-        let db = lock(&host.db);
-        let definition: String = db.query_row(
-            "SELECT definition FROM tasks WHERE id = ?",
-            [&task_id],
-            |r| r.get(0),
-        )?;
-        let mut definition = parse_json_text(Some(&definition));
-        merge_patch(&mut definition, &Value::Object(data.clone()));
-        db.execute(
-            "UPDATE tasks SET definition = ?, name = COALESCE(?, name) WHERE id = ?",
-            params![definition.to_string(), str_field(&body, "name"), task_id],
-        )?;
+        return Ok(fail(StatusCode::BAD_REQUEST, &message));
     }
+    lock(&host.db).execute(
+        "UPDATE tasks SET definition = ?, name = COALESCE(?, name) WHERE id = ?",
+        params![definition.to_string(), str_field(&body, "name"), task_id],
+    )?;
     let msg_id = host.enqueue(
         &task.agent_id,
         json!({ "type": "task_upsert", "taskId": task_id, "data": data }),
