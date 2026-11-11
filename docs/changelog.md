@@ -183,3 +183,23 @@ A joint suite (`tests/joint.rs`, 13 scenarios) runs the real agent binary agains
 side of a terminal as host-private, with the mini-host as the example.
 Verification: mini-host gates (nextest 10 passed, clippy, deny, shear), joint suite 13/13
 against gino-agent 0.3.0.
+
+## 2026-11-11 15:50 [progress]
+
+Agent 0.3.1: engine model lists, sign-in state and a configurable default engine. Protocol
+additions (optional and additive; `protocolVersion` stays 1):
+- Heartbeat `engines[]` items gain `auth` (`authenticated` | `unauthenticated` | `unknown`),
+  `models` (`[{id, name?, description?, isDefault?}]`), `defaultModel` and `baseUrlHost`. The agent
+  asks each CLI with the binary, credentials and config dir of a real run: claude's stream-json
+  `initialize` models and `claude auth status --json`; `codex app-server` `model/list` (every page)
+  and `account/read`. A configured key counts as signed in. It probes once the host config is
+  known, again after a `config_update` that changes an engine's binary, credentials or config dir,
+  and hourly. The list is reported unchanged and a requested model is passed through unchanged.
+- `config.engine.defaultEngine` (`claude` | `codex`, `null` clears) picks the engine of a task
+  that names none; `defaults` follows it, with that engine's configured model or, on heartbeats,
+  its CLI's default.
+mini-host rejects a task whose engine the agent does not advertise or whose model the agent's
+probe did not list (400). The e2e fakes answer both probes, and a joint scenario covers them.
+Verification: gino-agent gates (nextest 1001 passed, clippy, deny, shear), the §8 schema test,
+mini-host gates (nextest 10 passed, clippy, deny, shear), joint suite 14/14 against gino-agent
+0.3.1. sandbox-it and vm-it were not rerun; the change does not touch the sandbox launch path.
