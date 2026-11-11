@@ -96,6 +96,9 @@ when it builds its executor, so a change takes effect at the agent's next start.
 `config.engine` carries host-set engine options, delivered the same three ways; the next engine
 spawn uses them, and `null` on any of them clears it back to the agent's own value:
 
+- `defaultEngine` (string): the engine of a task that names none (`claude` | `codex`; unset is
+  `claude`). It applies at the next spawn; a name the agent does not run falls back to `claude`, so
+  set it only to an engine in `capabilities`.
 - `fallbackModel` (string): claude `--fallback-model`, the model claude switches to when the main
   one is overloaded. Ignored by codex.
 - `maxTurns` (positive integer): claude `--max-turns`, the turn cap of one run; hitting it ends the
@@ -156,12 +159,14 @@ Rules:
   never applied silently but recorded as a key change awaiting an operator re-pin. A runner
   without the object never receives encrypted work (§5.3).
 - `defaults` (optional, additive) is what a task without its own `engine`/`model` runs with:
-  `engine` (always present), `model` (`config.engine.model`, omitted when unset) and `baseUrlHost`
-  (only the host of `config.engine.anthropicBaseUrl` — never the full URL, credentials, path,
-  port or query; omitted when unset). It never carries a key. The same object rides on every
-  `heartbeat` (§5), recomputed after each `config_update`. On register it reflects only the
-  agent's local config, since the host config arrives in the response; the first heartbeat
-  carries the effective values.
+  `engine` (`config.engine.defaultEngine`, else `claude`; always present), `model` (that engine's
+  configured model — `config.engine.model` for claude, `config.engine.codex.model` for codex — else,
+  on heartbeats, the default its CLI reports in `engines`; omitted when neither is known) and
+  `baseUrlHost` (only the host of that engine's API base URL — `config.engine.anthropicBaseUrl` or
+  `config.engine.codex.openaiBaseUrl` — never the full URL, credentials, path, port or query;
+  omitted when unset). It never carries a key. The same object rides on every `heartbeat` (§5),
+  recomputed after each `config_update`. On register it reflects only the agent's local config,
+  since the host config arrives in the response; the first heartbeat carries the effective values.
 - `config.engine.isolation` (optional, additive) is the host-delivered default isolation for engine
   runs, delivered the same three ways as `config.entries`:
   `{"mode"?: "off|sandbox|vm", "network"?: {"mode"?: "none|full|allowlist", "allow"?: [rule]},
@@ -229,7 +234,7 @@ agent-architecture); bytes never travel in frames.
 | `thread_result` | `taskId`, `threadId` | `{status, result?, error?, failure_reason?, engine_session_id?, duration_ms, final_seq, attachments?, encryption_error?, engine?, model?, usage?}` | terminal outcome of one execution (mirror → `thread_runs`) |
 | `thread_message` | `taskId`, `threadId` | `{seq, kind, role?, content?, tool?, input?, output?, tool_use_id?, parent_tool_use_id?}` | one ordered transcript event (mirror → `messages`) |
 | `cron_state` | `taskId`, `cronId` | `{kind, schedule_type?, schedule_value?, continuity?, next_run?, status?, round_count, skipped_count, last_status?}` | local scheduling-ledger summary (mirror → `crons`) |
-| `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, configVersion?, defaults?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engine binaries the agent starts, `{name, version?, path}` each, probed in the background at startup (heartbeats before the probe finishes omit it); `configVersion` is the last config `version` the agent applied (§3), omitted until one arrives; `defaults` is the register object (§3), recomputed after every `config_update` |
+| `heartbeat` | — | `{activeThreads?, capabilities?, engines?, e2ee?, configVersion?, defaults?, …}` | liveness (interval from `config.heartbeatIntervalMs`); `capabilities` and `e2ee` are the same values as on register (§3); `engines` lists the engines the agent starts, `{name, version?, path, auth?, models?, defaultModel?, baseUrlHost?}` each (see below), probed in the background once the host config is known (heartbeats before the probe finishes omit it); `configVersion` is the last config `version` the agent applied (§3), omitted until one arrives; `defaults` is the register object (§3), recomputed after every `config_update` |
 | `fs_response` | `reqId` | `{ok, entries? \| stat? \| sha256 + size, error?}` | answers the `fs_request` with the same `reqId`; live-only |
 | `e2ee_key_packages` | — | `{one_time?, last_resort?}` | publish KeyPackages to the host's key directory (§5.3) |
 | `e2ee_request` | `taskId`, `reqId` | `{op, …}` | one Delivery Service operation on the task's group (§5.3); live-only |
@@ -282,6 +287,20 @@ Field semantics:
   final `result` event's `usage.{input_tokens, output_tokens, cache_read_input_tokens}` and
   `total_cost_usd`; codex: `turn.completed.usage.{input_tokens, output_tokens,
   cached_input_tokens}`, no cost. The keys inside `usage` are camelCase.
+- `engines` (`heartbeat`, optional, additive) describes each engine the agent can start. `name`,
+  `version` and `path` identify the binary. `auth` (`authenticated` | `unauthenticated` |
+  `unknown`) and `models` come from the engine's own CLI, run with the same binary, credentials
+  and config dir as a real run: claude answers the stream-json `initialize` control request with
+  its models and `claude auth status --json` with its login; `codex app-server` answers
+  `model/list` and `account/read`. A configured key (`anthropicApiKey`, `claudeCodeOauthToken`,
+  `codex.openaiApiKey`) counts as `authenticated`; the agent does not validate it. `models` is the
+  CLI's list unchanged, `[{id, name?, description?, isDefault?}]`, `isDefault` marking the model the
+  CLI runs when none is requested; it is absent when the CLI did not answer. `defaultModel` is the
+  model a task on this engine without its own model runs with: the configured one, else the CLI's
+  default. `baseUrlHost` is the host of the engine's configured API base URL. The agent probes again
+  after a `config_update` that changes an engine's binary, credentials or config dir, and hourly.
+  It never rewrites a requested model: checking a task's `model` against `models` (or filtering
+  the list) is host policy.
 - `seq` (`thread_message`) is per-thread monotonic (assigned serially by the runner);
   `final_seq` (`thread_result`) is the last `seq` emitted on the thread (see §6).
 - `tool_use_id` (`thread_message`) is the engine's id for a `tool_use` block, echoed on
@@ -1019,6 +1038,44 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                         "type": "string"
                       },
                       "path": {
+                        "type": "string"
+                      },
+                      "auth": {
+                        "type": "string",
+                        "enum": [
+                          "authenticated",
+                          "unauthenticated",
+                          "unknown"
+                        ]
+                      },
+                      "models": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "isDefault": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id"
+                          ],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "defaultModel": {
+                        "type": "string"
+                      },
+                      "baseUrlHost": {
                         "type": "string"
                       }
                     },
@@ -2860,6 +2917,44 @@ validate (protocol §1/§4.2) — while an unknown `type` matches no member and 
                         "type": "string"
                       },
                       "path": {
+                        "type": "string"
+                      },
+                      "auth": {
+                        "type": "string",
+                        "enum": [
+                          "authenticated",
+                          "unauthenticated",
+                          "unknown"
+                        ]
+                      },
+                      "models": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "isDefault": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id"
+                          ],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "defaultModel": {
+                        "type": "string"
+                      },
+                      "baseUrlHost": {
                         "type": "string"
                       }
                     },

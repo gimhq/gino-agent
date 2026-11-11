@@ -1,6 +1,6 @@
 # 20261110-1039-bks-runner-parity Runner settings, telemetry and exclusive file operations for bks
 
-- **status**: in_progress
+- **status**: completed
 - **createdAt**: 2026-11-10 10:39
 - **approvedAt**: 2026-11-10 11:00
 - **relatedTask**: 20261110-1039-bks-runner-parity

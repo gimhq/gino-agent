@@ -1,6 +1,6 @@
 # 20261110-1039-bks-runner-parity Runner settings, telemetry and exclusive file operations for bks
 
-- **status**: in_progress
+- **status**: completed
 - **priority**: P1
 - **owner**: gino-main-session
 - **createdAt**: 2026-11-10 10:39
@@ -39,3 +39,5 @@ Porting runner settings and exclusive file operations for bks
 
 Plan: [20261110-1039-bks-runner-parity](../plan/20261110-1039-bks-runner-parity.md). Supersedes the open items of
 `20261105-0743-host-integration-readiness`.
+
+- complete: released in v0.3.0

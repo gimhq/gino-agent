@@ -108,3 +108,7 @@ acked or replayed.
   credentials.
 - `capabilities` lists what the agent can run. Place a task naming `engine: "codex"` only on an
   agent that advertises `codex`.
+- Heartbeat `engines` reports, per engine, whether its CLI is signed in (`auth`), the models it
+  offers (`models`, as the CLI lists them) and the model a task without one gets (`defaultModel`).
+  The agent never rewrites a task's model, so check it against `models` before sending it; the
+  mini-host answers 400 for an engine or model the agent did not report.

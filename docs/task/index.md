@@ -39,5 +39,6 @@ Each task is a single line linking to its detail file. All detailed information 
 - [x] [**20261028-0050-vm-image-release Kernel, vmm and rootfs release channels with lode**](20261028-0050-vm-image-release.md) `P1`
 - [x] [**20261101-1538-config-update-clear Host config updates can clear fields**](20261101-1538-config-update-clear.md) `P1`
 - [-] [**20261105-0743-host-integration-readiness Single agent source and host integration readiness**](20261105-0743-host-integration-readiness.md) `P1`
-- [-] [**20261110-1039-bks-runner-parity Runner settings, telemetry and exclusive file operations for bks**](20261110-1039-bks-runner-parity.md) `P1`
+- [x] [**20261110-1039-bks-runner-parity Runner settings, telemetry and exclusive file operations for bks**](20261110-1039-bks-runner-parity.md) `P1`
 - [x] [**20261110-1130-mini-host-full-protocol Reference host covering the whole protocol**](20261110-1130-mini-host-full-protocol.md) `P1`
+- [x] [**20261111-1000-engine-models-auth Engine model lists, auth status and per-engine defaults**](20261111-1000-engine-models-auth.md) `P1`
