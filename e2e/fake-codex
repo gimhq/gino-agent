@@ -24,7 +24,36 @@
 # echoes it back, so the e2e can assert a full host→ws→runner→engine→ws→host
 # content round-trip. Codex reports no sub-agent linkage, so nothing here carries
 # a parent_tool_use_id — the e2e asserts that absence.
+#
+# It answers the agent's engine probe without counting it as a run: `--version`
+# and `codex app-server` with `initialize`, `account/read` (an account when
+# CODEX_API_KEY is set) and `model/list` in two pages (`gpt-fake`, the default,
+# then `gpt-joint`).
 set -u
+
+[ "${1:-}" = --version ] && { echo "codex-cli 0.0.0-fake"; exit 0; }
+if [ "${1:-}" = app-server ]; then
+  while IFS= read -r line; do
+    id="$(printf '%s' "$line" | jq -c '.id // empty')"
+    [ -n "$id" ] || continue
+    case "$(printf '%s' "$line" | jq -r '.method')" in
+      initialize) jq -cn --argjson id "$id" '{id:$id,result:{userAgent:"fake"}}' ;;
+      account/read)
+        jq -cn --argjson id "$id" --arg key "${CODEX_API_KEY:-}" '
+          {id:$id,result:{requiresOpenaiAuth:true,account:(if $key == "" then null else {type:"apiKey"} end)}}'
+        ;;
+      model/list)
+        if [ "$(printf '%s' "$line" | jq -r '.params.cursor // empty')" = p2 ]; then
+          jq -cn --argjson id "$id" '{id:$id,result:{data:[{id:"gpt-joint",model:"gpt-joint",displayName:"GPT Joint"}],nextCursor:null}}'
+        else
+          jq -cn --argjson id "$id" '{id:$id,result:{data:[{id:"gpt-fake",model:"gpt-fake",displayName:"GPT Fake",isDefault:true}],nextCursor:"p2"}}'
+        fi
+        ;;
+      *) jq -cn --argjson id "$id" '{id:$id,error:{code:-32601,message:"method not found"}}' ;;
+    esac
+  done
+  exit 0
+fi
 
 # The thread id this turn runs under. A real `codex exec` resumes a thread when
 # the runner appends `resume <thread_id>` LAST on the argv, so honour that and

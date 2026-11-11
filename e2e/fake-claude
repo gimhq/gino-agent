@@ -31,6 +31,12 @@
 # `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`), so the e2e can assert the effective
 # memory settings.
 #
+# It answers the agent's engine probe without counting it as a run: `--version`,
+# `auth status --json` (signed in when ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN
+# is set) and, for an invocation without `--session-id` / `--resume`, the
+# stream-json `initialize` control request with a fixed model list whose default
+# is `fake-e2e`.
+#
 # For host joint runs it also:
 #   - appends `{"engine":"claude","argv":[...],"probe":"$JOINT_PROBE"}` to
 #     `$FAKE_ENGINE_LOG` when that variable is set (a host can set both through
@@ -41,6 +47,26 @@
 #   - waits N seconds after its first event when the prompt holds `sleep:N`, so
 #     an interrupt can land mid-turn.
 set -u
+
+[ "${1:-}" = --version ] && { echo "2.0.0 (fake)"; exit 0; }
+if [ "${1:-}" = auth ]; then
+  logged_in=false
+  [ -n "${ANTHROPIC_API_KEY:-}${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && logged_in=true
+  printf '{"loggedIn":%s,"authMethod":"fake"}\n' "$logged_in"
+  exit 0
+fi
+case " $* " in
+  *' --session-id '*|*' --resume '*) ;;
+  *)
+    IFS= read -r line || exit 0
+    jq -cn --arg id "$(printf '%s' "$line" | jq -r '.request_id // empty')" '
+      {type:"control_response",response:{subtype:"success",request_id:$id,response:{models:[
+        {value:"default",resolvedModel:"fake-e2e",displayName:"Default (recommended)"},
+        {value:"fake-e2e",displayName:"Fake E2E"},
+        {value:"m-task",displayName:"Task model",description:"for task-level overrides"}]}}}'
+    exit 0
+    ;;
+esac
 
 if [ -n "${FAKE_ENGINE_LOG:-}" ]; then
   jq -cn --arg probe "${JOINT_PROBE:-}" '{engine:"claude",argv:$ARGS.positional,probe:$probe}' \
