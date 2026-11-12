@@ -145,17 +145,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake clang libclang-dev bubblewrap
 
       # bubblewrap runs unprivileged: lift Ubuntu's AppArmor restriction on user
-      # namespaces. The allowlist scenarios create a TUN device inside the sandbox,
-      # so /dev/net/tun must exist and be openable by the runner user. The bwrap
-      # call fails here, not in a scenario, when namespaces are still refused.
+      # namespaces and unload its profiles (the bwrap one strips the capabilities
+      # sandbox-init needs inside the namespace). The allowlist scenarios create a
+      # TUN device inside the sandbox, so /dev/net/tun must exist and be openable by
+      # the runner user. The bwrap call fails here, not in a scenario, when a
+      # namespace or a capability inside it is still refused.
       - name: User namespaces + /dev/net/tun
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo aa-teardown || true
           sudo modprobe tun
           sudo chmod 0666 /dev/net/tun
           test -c /dev/net/tun
           test "$(id -u)" -ne 0
-          bwrap --unshare-all --die-with-parent --ro-bind / / --proc /proc --dev /dev -- /usr/bin/true
+          bwrap --unshare-all --die-with-parent --uid 0 --gid 0 --cap-add CAP_NET_ADMIN \
+            --dev-bind / / --proc /proc -- ip tuntap add dev probe0 mode tun
 
       - name: Rust toolchain
         run: rustup show
