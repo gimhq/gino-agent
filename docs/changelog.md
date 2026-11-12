@@ -203,3 +203,26 @@ probe did not list (400). The e2e fakes answer both probes, and a joint scenario
 Verification: gino-agent gates (nextest 1001 passed, clippy, deny, shear), the §8 schema test,
 mini-host gates (nextest 10 passed, clippy, deny, shear), joint suite 14/14 against gino-agent
 0.3.1. sandbox-it and vm-it were not rerun; the change does not touch the sandbox launch path.
+
+## 2026-11-12 02:30 [fix]
+
+The daemon no longer follows a symlink inside a tree the engine can write. A sandboxed or VM
+engine could plant one in its work dir or task memory tree and have the daemon, which runs
+outside the isolation, act on a host file: the codex memory context read `index.md` and
+`system/definition.md` through it, `output/` as a link uploaded the linked directory, `inputs`
+or `inputs/<name>` as a link received the next attachment, a linked directory under `project/`
+redirected provisioning links, and a link at `.engine-home` redirected the mount targets.
+`paths.rs` now walks such paths below their root one component at a time with `O_NOFOLLOW`
+(`open_dir_beneath`, `open_file_beneath`, `create_file_in`, `touch_beneath`); a planted link is
+refused, or replaced where the daemon owns the file, and a linked memory file renders as "not a
+regular file". CI gains the `agent-sandbox` job, which runs the `tests/sandbox.rs` scenarios
+under bubblewrap on every push.
+The `tests/sandbox.rs` fake engine now ignores the daemon's engine probe (it ran its probe body
+outside the sandbox since 0.3.1, which failed the write-confinement scenario).
+Verification: agent gates (fmt, clippy, typos, nextest 1009 passed, doctests, deny, shear);
+`scripts/sandbox-it.sh` 17/17; the five regression tests fail without the fix.
+
+## 2026-11-12 03:40 [release]
+
+gino-agent 0.3.2: the daemon no longer follows symlinks inside engine-writable trees (see the
+entry above), and CI runs the sandbox suite.
