@@ -130,6 +130,55 @@ jobs:
           path: gino-agent/target/x86_64-unknown-linux-musl/release/gino-agent
           retention-days: 3
 
+  agent-sandbox:
+    name: agent (rust) — engine sandbox suite (bubblewrap)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: gino-agent
+    steps:
+      - uses: actions/checkout@v7
+
+      # The agent job's C toolchain, plus bubblewrap for the sandbox itself.
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake clang libclang-dev bubblewrap
+
+      # bubblewrap runs unprivileged: lift Ubuntu's AppArmor restriction on user
+      # namespaces. The allowlist scenarios create a TUN device inside the sandbox,
+      # so /dev/net/tun must exist and be openable by the runner user. The bwrap
+      # call fails here, not in a scenario, when namespaces are still refused.
+      - name: User namespaces + /dev/net/tun
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo modprobe tun
+          sudo chmod 0666 /dev/net/tun
+          test -c /dev/net/tun
+          test "$(id -u)" -ne 0
+          bwrap --unshare-all --die-with-parent --ro-bind / / --proc /proc --dev /dev -- /usr/bin/true
+
+      - name: Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            gino-agent/target
+          key: cargo-sandbox-${{ runner.os }}-${{ hashFiles('gino-agent/Cargo.lock') }}
+          restore-keys: cargo-sandbox-${{ runner.os }}-
+
+      # scripts/sandbox-it.sh without the container: the runner user is already
+      # unprivileged. Every scenario is #[ignore] and returns early without
+      # GINO_SANDBOX_IT=1; one at a time, as in the script. The fake engines need
+      # bash, perl and coreutils (all on the runner image).
+      - name: Sandbox suite
+        env:
+          GINO_SANDBOX_IT: "1"
+        run: cargo test --release --locked --test sandbox -- --ignored --test-threads=1
+
   vmm:
     name: vmm (rust) — fmt + clippy + test + supply chain
     runs-on: ubuntu-latest
