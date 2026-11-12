@@ -11,3 +11,5 @@ hax = "hax"
 [default.extend-identifiers]
 # The inheritable capability set field of /proc/self/status.
 CapInh = "CapInh"
+# The O_WRONLY open flag (rustix `OFlags::WRONLY`).
+WRONLY = "WRONLY"

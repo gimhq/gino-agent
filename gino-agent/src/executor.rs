@@ -1365,7 +1365,11 @@ impl ThreadExecutor {
         let project_dir = work_dir.join("project");
         // Create `project/` and the isolated git working area `project/workspace/`
         // in one shot (best-effort, mirroring `ensure_work_dir`).
-        if let Err(err) = std::fs::create_dir_all(project_dir.join("workspace")) {
+        // The engine can write `work_dir` between turns: a symlink it planted at
+        // `project` is refused, not followed.
+        if let Err(err) =
+            crate::paths::create_dir_beneath(&work_dir, Path::new("project/workspace"))
+        {
             warn!(thread = %thread.id, error = %err, "failed to create project dir (continuing)");
         }
         // Materialize the task's desired entries into `project/` under the TASK

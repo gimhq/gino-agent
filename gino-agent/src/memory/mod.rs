@@ -10,7 +10,7 @@
 
 use std::fmt::Write as _;
 use std::fs::{self, OpenOptions};
-use std::io::{self, Write as _};
+use std::io::{self, Read as _, Write as _};
 use std::path::{Component, Path, PathBuf};
 
 /// Default soft cap on the total size of one memory tree.
@@ -390,10 +390,13 @@ fn render_tree(out: &mut String, dir: &Path, tree: Tree, max_bytes: u64) -> io::
     let label = tree.label();
     for file in [INDEX_FILE, DEFINITION_FILE] {
         let _ = write!(out, "\n### {label}: {file}\n\n");
-        match fs::read(dir.join(file)) {
+        match read_plain(dir, file) {
             Ok(bytes) => out.push_str(&truncated(tree, file, &String::from_utf8_lossy(&bytes))),
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 let _ = writeln!(out, "_{label}: {file} is missing._");
+            }
+            Err(err) if crate::paths::is_not_plain(&err) => {
+                let _ = writeln!(out, "_{label}: {file} is not a regular file._");
             }
             Err(err) => return Err(err),
         }
@@ -408,6 +411,14 @@ fn render_tree(out: &mut String, dir: &Path, tree: Tree, max_bytes: u64) -> io::
         );
     }
     Ok(())
+}
+
+/// Read `file` of the tree at `dir`. The engine writes the tree and this may run
+/// outside its sandbox, so no symlink below `dir` is followed.
+fn read_plain(dir: &Path, file: &str) -> io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    crate::paths::open_file_beneath(dir, Path::new(file))?.read_to_end(&mut bytes)?;
+    Ok(bytes)
 }
 
 /// `content` cut to [`FILE_CHAR_CAP`] chars plus a notice naming the tree and
@@ -1027,5 +1038,38 @@ mod tests {
         }
         assert!(ws.path().join("memory/task/t1/index.md").exists());
         assert!(ws.path().join("memory/agent/index.md").exists());
+    }
+
+    #[test]
+    fn a_symlinked_memory_file_is_never_read() {
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("secret"), "HOST-SECRET").unwrap();
+        fs::create_dir(outside.path().join("system")).unwrap();
+        fs::write(outside.path().join("system/definition.md"), "HOST-RULES").unwrap();
+
+        // `index.md` planted as a link to a host file.
+        let task_dir = tree_with("task fact", "task rules");
+        fs::remove_file(task_dir.path().join("index.md")).unwrap();
+        std::os::unix::fs::symlink(
+            outside.path().join("secret"),
+            task_dir.path().join("index.md"),
+        )
+        .unwrap();
+        let out = render_context(None, Some(task_dir.path()), DEFAULT_MAX_BYTES);
+        assert!(!out.contains("HOST-SECRET"), "{out}");
+        assert!(out.contains("_task memory: index.md is not a regular file._"));
+        assert!(out.contains("task rules"));
+
+        // `system/` planted as a link to a host dir.
+        let task_dir = tree_with("task fact", "task rules");
+        fs::remove_dir_all(task_dir.path().join("system")).unwrap();
+        std::os::unix::fs::symlink(
+            outside.path().join("system"),
+            task_dir.path().join("system"),
+        )
+        .unwrap();
+        let out = render_context(None, Some(task_dir.path()), DEFAULT_MAX_BYTES);
+        assert!(!out.contains("HOST-RULES"), "{out}");
+        assert!(out.contains("task fact"));
     }
 }

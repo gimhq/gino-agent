@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use super::{
     AGENT_MEMORY_MOUNT, CONVERSATIONS_MOUNT, IsolationError, NetworkMode, TASK_MEMORY_MOUNT,
 };
+use crate::paths::{create_dir_beneath, touch_beneath};
 use crate::provisioning::store::store_dir;
 
 /// Host root entries that are mirrored into the sandbox, in argv order.
@@ -544,28 +545,24 @@ pub(crate) fn bwrap_args(
 }
 
 /// Create the engine home and the mount targets for the globals bound into it.
+/// The home lies in the engine-writable work dir: nothing is created through a
+/// symlink there.
 pub(crate) fn prepare_engine_home(layout: &SandboxLayout) -> std::io::Result<()> {
-    fs::create_dir_all(&layout.engine_home)?;
+    let home = layout
+        .engine_home
+        .strip_prefix(&layout.work_dir)
+        .map_err(|_| std::io::Error::other("the engine home is outside the work dir"))?;
+    create_dir_beneath(&layout.work_dir, home)?;
     if layout.global_claude_md().is_some() {
-        fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(layout.engine_home.join("CLAUDE.md"))?;
+        touch_beneath(&layout.work_dir, &home.join("CLAUDE.md"))?;
     }
-    let skills = layout.global_skills();
-    if !skills.is_empty() {
-        let skills_dir = layout.engine_home.join("skills");
-        fs::create_dir_all(&skills_dir)?;
-        for skill in skills {
-            let target = skills_dir.join(&skill.name);
-            if skill.is_dir {
-                fs::create_dir_all(&target)?;
-            } else {
-                fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&target)?;
-            }
+    let skills = home.join("skills");
+    for skill in layout.global_skills() {
+        let target = skills.join(&skill.name);
+        if skill.is_dir {
+            create_dir_beneath(&layout.work_dir, &target)?;
+        } else {
+            touch_beneath(&layout.work_dir, &target)?;
         }
     }
     Ok(())
@@ -1198,6 +1195,33 @@ mod tests {
         prepare_engine_home(&l).unwrap();
         assert!(l.engine_home.is_dir());
         assert_eq!(fs::read_dir(&l.engine_home).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn prepare_engine_home_refuses_planted_symlinks() {
+        let outside = tempfile::tempdir().unwrap();
+        for planted in [
+            ".engine-home",
+            ".engine-home/CLAUDE.md",
+            ".engine-home/skills",
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            let mut l = layout();
+            l.work_dir = tmp.path().join("t1");
+            l.engine_home = engine_home(&l.work_dir);
+            let link = l.work_dir.join(planted);
+            fs::create_dir_all(link.parent().unwrap()).unwrap();
+            std::os::unix::fs::symlink(outside.path().join("target"), &link).unwrap();
+            assert!(prepare_engine_home(&l).is_err(), "{planted}");
+            // A dir target that exists must stay empty as well.
+            fs::remove_file(&link).unwrap();
+            std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+            if planted.ends_with("CLAUDE.md") {
+                continue;
+            }
+            assert!(prepare_engine_home(&l).is_err(), "{planted}");
+        }
+        assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
     }
 
     #[test]

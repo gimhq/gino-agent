@@ -454,12 +454,14 @@ impl AttachmentManager {
                 });
             }
             // 100 MB-scale write → blocking pool, not the async worker.
+            // The engine can write `work_dir` between turns: no symlink it
+            // planted at `inputs` or at the file name is followed.
             let dest = inputs_dir.join(safe);
-            let dir = inputs_dir.clone();
-            let write_dest = dest.clone();
+            let root = work_dir.to_path_buf();
+            let file_name = safe.to_owned();
             run_blocking(move || {
-                std::fs::create_dir_all(&dir)?;
-                std::fs::write(&write_dest, &bytes)
+                let dir = crate::paths::open_dir_beneath(&root, Path::new(INPUTS_SUBDIR), true)?;
+                crate::paths::create_file_in(&dir, file_name.as_ref())?.write_all(&bytes)
             })
             .await??;
             if encrypted.is_none() {
@@ -474,7 +476,8 @@ impl AttachmentManager {
     /// resulting outbound descriptors. Best-effort per file: a file that exceeds
     /// the single-file cap, fails the allowlist, or fails to upload is logged and
     /// skipped (a partial artifact set must not sink an otherwise-good run); the
-    /// per-execution budget caps the total. Symlinks are ignored (no traversal).
+    /// per-execution budget caps the total. Symlinks are ignored (no traversal),
+    /// `output` itself included.
     pub(crate) async fn collect_outputs(&self, work_dir: &Path) -> Vec<AttachmentDescriptor> {
         self.collect(work_dir, None).await.unwrap_or_default()
     }
@@ -500,9 +503,9 @@ impl AttachmentManager {
         work_dir: &Path,
         encrypted: Option<(&E2ee, &str)>,
     ) -> Result<Vec<AttachmentDescriptor>, EncryptionFailure> {
-        let output_dir = work_dir.join(OUTPUT_SUBDIR);
         // The recursive dir walk is a filesystem scan → blocking pool.
-        let scan = run_blocking(move || list_files(&output_dir))
+        let root = work_dir.to_path_buf();
+        let scan = run_blocking(move || list_files(&root, Path::new(OUTPUT_SUBDIR)))
             .await
             .and_then(|listed| listed);
         let files = match scan {
@@ -514,17 +517,22 @@ impl AttachmentManager {
         };
         let mut descriptors = Vec::new();
         let mut total = 0_u64;
-        for (abs, rel) in files {
+        for rel in files {
             // An encrypted task's file names are content: logged as sealed.
             let file = if encrypted.is_some() {
                 "(sealed)"
             } else {
                 rel.as_str()
             };
-            let size = match std::fs::metadata(&abs) {
-                Ok(meta) => meta.len(),
+            // Opened without following a symlink; the size and the bytes both
+            // come from this handle.
+            let opened =
+                crate::paths::open_file_beneath(work_dir, &Path::new(OUTPUT_SUBDIR).join(&rel))
+                    .and_then(|handle| handle.metadata().map(|meta| (handle, meta.len())));
+            let (handle, size) = match opened {
+                Ok(opened) => opened,
                 Err(err) => {
-                    warn!(file, error = %err, "skipping output artifact (stat failed)");
+                    warn!(file, error = %err, "skipping output artifact (open failed)");
                     continue;
                 }
             };
@@ -536,7 +544,7 @@ impl AttachmentManager {
                 warn!(file, "per-execution output budget reached; stopping");
                 break;
             }
-            match self.upload_one(&abs, &rel, encrypted).await {
+            match self.upload_one(handle, &rel, encrypted).await {
                 Ok(descriptor) => {
                     total = total.saturating_add(size);
                     descriptors.push(descriptor);
@@ -819,7 +827,7 @@ impl AttachmentManager {
     /// uploaded.
     async fn upload_one(
         &self,
-        abs: &Path,
+        file: std::fs::File,
         rel: &str,
         encrypted: Option<(&E2ee, &str)>,
     ) -> Result<AttachmentDescriptor, AttachmentError> {
@@ -828,24 +836,16 @@ impl AttachmentManager {
         let content_type = guess_content_type(rel);
         self.check_content_type(&content_type)?;
         if let Some((e2ee, task_id)) = encrypted {
-            return self.upload_sealed(abs, rel, e2ee, task_id).await;
+            return self.upload_sealed(file, rel, e2ee, task_id).await;
         }
         // Full read + full-buffer hash + cache write (incl. the LRU scan inside
         // cache_put) of a 100 MB-scale artifact → blocking pool.
         let (bytes, sha256) = {
-            let abs = abs.to_path_buf();
             let max_single = self.config.max_single_bytes;
             let cache_dir = self.cache_dir.clone();
             let cache_cap = self.config.cache_max_bytes;
             run_blocking(move || -> Result<(Vec<u8>, String), AttachmentError> {
-                let bytes = std::fs::read(&abs)?;
-                let size = bytes.len() as u64;
-                if size > max_single {
-                    return Err(AttachmentError::SizeLimitExceeded {
-                        size,
-                        limit: max_single,
-                    });
-                }
+                let bytes = read_capped(file, max_single)?;
                 let sha256 = sha256_hex(&bytes);
                 // Cache before the move so a later inbound fetch of the same
                 // bytes hits.
@@ -874,26 +874,14 @@ impl AttachmentManager {
     /// under `<sha256>.bin`.
     async fn upload_sealed(
         &self,
-        abs: &Path,
+        file: std::fs::File,
         rel: &str,
         e2ee: &E2ee,
         task_id: &str,
     ) -> Result<AttachmentDescriptor, AttachmentError> {
         let bytes = {
-            let abs = abs.to_path_buf();
             let max_single = self.config.max_single_bytes;
-            run_blocking(move || -> Result<Vec<u8>, AttachmentError> {
-                let bytes = std::fs::read(&abs)?;
-                let size = bytes.len() as u64;
-                if size > max_single {
-                    return Err(AttachmentError::SizeLimitExceeded {
-                        size,
-                        limit: max_single,
-                    });
-                }
-                Ok(bytes)
-            })
-            .await??
+            run_blocking(move || read_capped(file, max_single)).await??
         };
         let (envelope, digest) = e2ee
             .seal_file(task_id, &bytes)
@@ -1131,19 +1119,43 @@ fn guess_content_type(name: &str) -> String {
     content_type.to_owned()
 }
 
-/// List every **regular file** under `root` (recursively), returning
-/// `(absolute path, relative-path name with `/` separators)`. Symlinks are
-/// skipped (`file_type` does not follow them), so neither a symlink loop nor a
-/// symlink pointing outside `root` can be uploaded. A missing `root` → empty.
-fn list_files(root: &Path) -> std::io::Result<Vec<(PathBuf, String)>> {
+/// Read all of `file`, refusing more than `max_bytes`.
+fn read_capped(file: std::fs::File, max_bytes: u64) -> Result<Vec<u8>, AttachmentError> {
+    use std::io::Read as _;
+
+    let mut bytes = Vec::new();
+    file.take(max_bytes.saturating_add(1))
+        .read_to_end(&mut bytes)?;
+    let size = bytes.len() as u64;
+    if size > max_bytes {
+        return Err(AttachmentError::SizeLimitExceeded {
+            size,
+            limit: max_bytes,
+        });
+    }
+    Ok(bytes)
+}
+
+/// List every **regular file** under `<work_dir>/<subdir>` (recursively) by its
+/// relative-path name with `/` separators. Symlinks are skipped — `subdir`
+/// itself included, and `file_type` does not follow the ones below it — so
+/// neither a symlink loop nor a symlink pointing outside the dir can be
+/// uploaded. A missing or non-directory `subdir` → empty.
+fn list_files(work_dir: &Path, subdir: &Path) -> std::io::Result<Vec<String>> {
     let mut out = Vec::new();
-    if root.is_dir() {
-        collect_files(root, root, &mut out)?;
+    match crate::paths::open_dir_beneath(work_dir, subdir, false) {
+        Ok(_) => {
+            let root = work_dir.join(subdir);
+            collect_files(&root, &root, &mut out)?;
+        }
+        Err(err)
+            if err.kind() == std::io::ErrorKind::NotFound || crate::paths::is_not_plain(&err) => {}
+        Err(err) => return Err(err),
     }
     Ok(out)
 }
 
-fn collect_files(root: &Path, dir: &Path, out: &mut Vec<(PathBuf, String)>) -> std::io::Result<()> {
+fn collect_files(root: &Path, dir: &Path, out: &mut Vec<String>) -> std::io::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
@@ -1153,8 +1165,7 @@ fn collect_files(root: &Path, dir: &Path, out: &mut Vec<(PathBuf, String)>) -> s
         } else if file_type.is_file()
             && let Ok(rel) = path.strip_prefix(root)
         {
-            let name = rel.to_string_lossy().replace('\\', "/");
-            out.push((path.clone(), name));
+            out.push(rel.to_string_lossy().replace('\\', "/"));
         }
     }
     Ok(())
@@ -1707,5 +1718,64 @@ mod tests {
         );
         // And the host proxy itself was never contacted for this descriptor.
         assert!(host.received_requests().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn collect_outputs_ignores_an_output_dir_that_is_a_symlink() {
+        let ws = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::write(outside.path().join("id_ed25519"), b"HOST-SECRET").unwrap();
+        let backend = Arc::new(MemBackend::default());
+        let mgr = manager(&backend, ws.path(), AttachmentsConfig::default());
+        let work_dir = ws.path().join("threads").join("th-link");
+        std::fs::create_dir_all(&work_dir).unwrap();
+        std::os::unix::fs::symlink(outside.path(), work_dir.join("output")).unwrap();
+
+        assert!(mgr.collect_outputs(&work_dir).await.is_empty());
+        assert!(backend.uploads.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn materialize_never_writes_through_a_planted_symlink() {
+        let ws = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::write(outside.path().join("victim"), b"KEEP").unwrap();
+        let backend = MemBackend::with("/agent/attachments/a-1", b"INPUT-DATA");
+        let mgr = manager(&backend, ws.path(), AttachmentsConfig::default());
+        let descriptors = vec![descriptor(
+            "doc.txt",
+            b"INPUT-DATA",
+            "/agent/attachments/a-1",
+        )];
+
+        // `inputs/<name>` planted as a link: replaced by the real file.
+        let work_dir = ws.path().join("threads").join("th-file");
+        std::fs::create_dir_all(work_dir.join("inputs")).unwrap();
+        std::os::unix::fs::symlink(
+            outside.path().join("victim"),
+            work_dir.join("inputs").join("doc.txt"),
+        )
+        .unwrap();
+        mgr.materialize_inputs(&work_dir, &descriptors)
+            .await
+            .unwrap();
+        let dest = work_dir.join("inputs").join("doc.txt");
+        assert!(!dest.is_symlink());
+        assert_eq!(std::fs::read(&dest).unwrap(), b"INPUT-DATA");
+        assert_eq!(
+            std::fs::read(outside.path().join("victim")).unwrap(),
+            b"KEEP"
+        );
+
+        // `inputs` itself planted as a link: refused, nothing lands outside.
+        let work_dir = ws.path().join("threads").join("th-dir");
+        std::fs::create_dir_all(&work_dir).unwrap();
+        std::os::unix::fs::symlink(outside.path(), work_dir.join("inputs")).unwrap();
+        let err = mgr
+            .materialize_inputs(&work_dir, &descriptors)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AttachmentError::Io(_)), "{err:?}");
+        assert!(!outside.path().join("doc.txt").exists());
     }
 }

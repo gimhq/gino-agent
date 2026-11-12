@@ -15,17 +15,21 @@
 //! (zero-copy; update = repoint). All store writes are atomic (temp sibling +
 //! rename) and idempotent (content-addressed ⇒ already-present is a no-op).
 
+use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::io::Read;
+use std::os::fd::OwnedFd;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use rustix::fs::{AtFlags, renameat, symlinkat, unlinkat};
+use rustix::io::Errno;
 use sha2::{Digest, Sha256};
 use tracing::debug;
 
 use super::{ProvisioningError, safe_link_path, short_id};
-use crate::paths::safe_component;
+use crate::paths::{open_dir_beneath, safe_component};
 
 /// Fixed sub-directory of the workspace `store_root` holding the store tree.
 const STORE_SUBDIR: &str = "store";
@@ -233,22 +237,23 @@ pub(crate) fn link(
             path: store_path.to_path_buf(),
         });
     }
-    if let Some(parent) = link_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
+    // A task scope root lies in the engine-writable work dir: the parent is
+    // opened without following a symlink, and the link is made relative to it.
+    let (parent, name) = link_parent(scope_root, target, true)?;
     // Build the new symlink under a temp sibling name, then rename it over any
     // existing entry — repoint is atomic (no window where <target> is absent).
     let tmp = tmp_sibling(&link_path);
-    let _ = std::fs::remove_file(&tmp);
-    std::os::unix::fs::symlink(store_path, &tmp)?;
-    if std::fs::rename(&tmp, &link_path).is_err() {
+    let tmp_name = tmp.file_name().unwrap_or(tmp.as_os_str());
+    let _ = unlinkat(&parent, tmp_name, AtFlags::empty());
+    symlinkat(store_path, &parent, tmp_name).map_err(std::io::Error::from)?;
+    if renameat(&parent, tmp_name, &parent, name).is_err() {
         // The slot is squatted by a non-symlink (e.g. a real dir) that rename(2)
         // will not replace; remove it and retry once. We only ever manage
         // symlinks here, so clobbering whatever is in the slot is intentional.
         remove_path(&link_path);
-        if let Err(err) = std::fs::rename(&tmp, &link_path) {
-            let _ = std::fs::remove_file(&tmp);
-            return Err(err.into());
+        if let Err(err) = renameat(&parent, tmp_name, &parent, name) {
+            let _ = unlinkat(&parent, tmp_name, AtFlags::empty());
+            return Err(std::io::Error::from(err).into());
         }
     }
     debug!(target, kind = ?kind, store = %store_path.display(), "linked provisioning entry into scope");
@@ -259,14 +264,34 @@ pub(crate) fn link(
 /// missing link is `Ok`). The store entry it points at is untouched — GC of the
 /// store is [`remove_store_entry`], gated by the DB refcount in the reconcile L3.
 pub(crate) fn remove_link(scope_root: &Path, target: &str) -> Result<(), ProvisioningError> {
-    let link_path = safe_link_path(scope_root, target)?;
-    // symlink_metadata does not follow the link, and remove_file removes the link
-    // itself (never its target), so the store entry is left intact.
-    match std::fs::symlink_metadata(&link_path) {
-        Ok(_) => Ok(std::fs::remove_file(&link_path)?),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(err.into()),
+    safe_link_path(scope_root, target)?;
+    let (parent, name) = match link_parent(scope_root, target, false) {
+        Ok(found) => found,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(err.into()),
+    };
+    // unlinkat removes the link itself (never its target), so the store entry
+    // is left intact.
+    match unlinkat(&parent, name, AtFlags::empty()) {
+        Ok(()) | Err(Errno::NOENT) => Ok(()),
+        Err(err) => Err(std::io::Error::from(err).into()),
     }
+}
+
+/// The directory holding the link of `target` under `scope_root`, opened
+/// without following a symlink at the scope root or below it, and the link's
+/// name. `create` makes the missing directories.
+fn link_parent<'a>(
+    scope_root: &Path,
+    target: &'a str,
+    create: bool,
+) -> std::io::Result<(OwnedFd, &'a OsStr)> {
+    let target = Path::new(target);
+    let name = target
+        .file_name()
+        .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+    let parent = target.parent().unwrap_or(Path::new(""));
+    Ok((open_dir_beneath(scope_root, parent, create)?, name))
 }
 
 /// Remove the store file/dir for `(name, sha256)` — the refcount-GC primitive
@@ -837,5 +862,36 @@ mod tests {
         let store = materialize_file(root.path(), "cfg", &sha, bytes).unwrap();
         let err = link(&scope, "../escape", &store, EntryKind::File).unwrap_err();
         assert!(matches!(err, ProvisioningError::UnsafeTarget { .. }));
+    }
+
+    #[test]
+    fn link_and_remove_link_refuse_a_symlinked_parent() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::create_dir(outside.path().join("demo")).unwrap();
+        std::fs::write(outside.path().join("demo/keep"), "KEEP").unwrap();
+        let scope = root.path().join("project");
+        std::fs::create_dir_all(scope.join(".claude")).unwrap();
+        std::os::unix::fs::symlink(outside.path(), scope.join(".claude/skills")).unwrap();
+        let bytes = b"CONFIG\n";
+        let sha = sha256_hex(bytes);
+        let store = materialize_file(root.path(), "claude-md", &sha, bytes).unwrap();
+
+        let err = link(&scope, ".claude/skills/demo", &store, EntryKind::File).unwrap_err();
+        assert!(matches!(err, ProvisioningError::Io(_)), "{err:?}");
+        let err = remove_link(&scope, ".claude/skills/demo").unwrap_err();
+        assert!(matches!(err, ProvisioningError::Io(_)), "{err:?}");
+        // The outside tree is untouched: nothing removed, nothing added.
+        assert_eq!(
+            std::fs::read(outside.path().join("demo/keep")).unwrap(),
+            b"KEEP"
+        );
+        assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 1);
+
+        // A scope root that is itself a link is refused as well.
+        let linked_scope = root.path().join("linked");
+        std::os::unix::fs::symlink(outside.path(), &linked_scope).unwrap();
+        assert!(link(&linked_scope, "CLAUDE.md", &store, EntryKind::File).is_err());
+        assert_eq!(std::fs::read_dir(outside.path()).unwrap().count(), 1);
     }
 }

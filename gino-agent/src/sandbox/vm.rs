@@ -707,6 +707,29 @@ fn view_entries(ctx: &LaunchContext<'_>, work_dir: &Path, home: &Path) -> Vec<Vi
     view
 }
 
+/// Create the mount target `path`, a dir or an empty file. One inside the
+/// engine-writable work dir is created without following a symlink there.
+fn create_placeholder(work_dir: Option<&Path>, path: &Path, is_dir: bool) -> std::io::Result<()> {
+    if let Some(work_dir) = work_dir
+        && let Ok(rel) = path.strip_prefix(work_dir)
+    {
+        return if is_dir {
+            crate::paths::create_dir_beneath(work_dir, rel)
+        } else {
+            crate::paths::touch_beneath(work_dir, rel)
+        };
+    }
+    if is_dir {
+        return std::fs::create_dir_all(path);
+    }
+    path.parent().map_or(Ok(()), std::fs::create_dir_all)?;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map(drop)
+}
+
 /// One virtiofs share of a VM run.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Share {
@@ -1103,20 +1126,8 @@ pub(crate) fn prepare(
     )?;
 
     for (path, is_dir) in &plan.placeholders {
-        let created = if *is_dir {
-            std::fs::create_dir_all(path)
-        } else {
-            path.parent()
-                .map_or(Ok(()), std::fs::create_dir_all)
-                .and_then(|()| {
-                    std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(path)
-                        .map(drop)
-                })
-        };
-        created.map_err(|err| spawn_err(&path.display().to_string(), err))?;
+        create_placeholder(ctx.work_dir, path, *is_dir)
+            .map_err(|err| spawn_err(&path.display().to_string(), err))?;
     }
     let ctl = dir.0.join(BOOT_DIR_NAME).join(CTL_DIR_NAME);
     let view = ctl.join(VIEW_DIR_NAME);
